@@ -11,28 +11,16 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const morgan = require('morgan');
 
+const { bot } = require('./tg/tg-bot');
+bot.launch(); // запуск бота
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 // app.use(session({ secret: '$ekreT', saveUninitialized: false, resave: false, cookie: { maxAge: 86400 }}));
 app.use(morgan('dev'));
 
-let corsOptions = {
-  origin: true,
-  credentials: true,
-  methods: ['GET,POST,PUT,DELETE'],
-  optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
-};
 app.use(cors());
-//cors
-// app.use((req, res, next) => {
-//   res.setHeader('Access-Control-Allow-Origin', '*');
-//   res.setHeader(
-//     'Access-Control-Allow-Methods',
-//     'OPTIONS, GET, POST, PUT, PATCH, DELETE'
-//   );
-//   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-//   next();
-// });
+app.locals.bot = bot;
 
 //все роуты происходят с главной страницы, так как приложение на Vue (Spa)
 const freelanceRoutes = require('./routes/freelance')(router);

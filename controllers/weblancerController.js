@@ -28,6 +28,7 @@ let weblancerPrevProjects = {
   date: 'none',
 };
 
+let isLoading = false;
 let canLoading;
 
 // ! *********************************************************************************
@@ -581,14 +582,15 @@ exports.weblancerCheerio = async (req, res, next) => {
 // ? weblancerStart********************************************************************************
 exports.weblancerProjectsRead = async (req, res, next) => {
   if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(weblancerProjects.projects).length, date: weblancerProjects.date });
+  let firstTime = req.query.firstTime;
 
-  let cnt = req.query.cnt;
+  let cnt = +req.query.cnt;
   let length = Object.keys(weblancerProjects.projects).length;
   let arr = Object.keys(weblancerProjects.projects)[length - cnt];
 
   let projectsArr;
   let deleted = null;
-  if (req.query.first === 'true') {
+  if (firstTime === 'true') {
     projectsArr = utils.copyArrOfObjects(weblancerProjects.projects[arr]);
   } else {
     projectsArr = utils.diff(weblancerPrevProjects.projects[arr], weblancerProjects.projects[arr]);
@@ -603,20 +605,33 @@ exports.weblancerProjectsRead = async (req, res, next) => {
 };
 
 let timeout;
+let firstTimeReadProjects = true;
 exports.weblancerStart = async (req, res, next) => {
   canLoading = true;
-  let fileExists = utils.fileExists('../client/src/assets/weblancerProjects.json');
-  if (fileExists) {
-    let projects = JSON.parse(utils.readFileSync('../client/src/assets/weblancerProjects.json'));
-    if (projects.projects === undefined) {
-      res.json({ start: true, message: 'file is empty' });
+
+  // console.log('first', firstTimeReadProjects, 'isLoading', isLoading);
+  if (firstTimeReadProjects) {
+    let fileExists = utils.fileExists('../client/src/assets/weblancerProjects.json');
+    if (fileExists) {
+      let projects = JSON.parse(utils.readFileSync('../client/src/assets/weblancerProjects.json'));
+      if (projects.projects === undefined) {
+        res.json({ start: true, message: 'file is empty' });
+      } else {
+        weblancerProjects = utils.deepCloneObject(projects);
+        weblancerPrevProjects = utils.deepCloneObject(projects);
+        res.json({ start: true });
+      }
     } else {
-      weblancerProjects = utils.deepCloneObject(projects);
-      weblancerPrevProjects = utils.deepCloneObject(projects);
-      res.json({ start: true });
+      res.json({ start: true, message: 'file not exists' });
     }
+    isLoading = true;
+    firstTimeReadProjects = false;
   } else {
-    res.json({ start: true, message: 'file not exists' });
+    if (isLoading) {
+      return res.json({ start: true });
+    }
+    isLoading = true;
+    res.json({ start: true });
   }
 
   const recursiveLoad = async () => {
@@ -654,6 +669,7 @@ exports.weblancerStart = async (req, res, next) => {
 // ? weblancerAbort********************************************************************************
 exports.weblancerAbort = async (req, res, next) => {
   clearTimeout(timeout);
+  isLoading = false;
   canLoading = false;
   await createNewNightmare({ aborted: true });
 

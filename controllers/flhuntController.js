@@ -26,6 +26,7 @@ let flhuntPrevProjects = {
   date: 'none',
 };
 
+let isLoading = false;
 let canLoading;
 
 const url = 'https://freelancehunt.com';
@@ -540,6 +541,7 @@ exports.flhuntClick = async (req, res, next) => {
 // ? flhuntStart**************************************************************************
 exports.flhuntProjectsRead = async (req, res, next) => {
   if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(flhuntProjects.projects).length, date: flhuntProjects.date });
+  let firstTime = req.query.firstTime;
 
   let cnt = req.query.cnt;
   let length = Object.keys(flhuntProjects.projects).length;
@@ -547,7 +549,7 @@ exports.flhuntProjectsRead = async (req, res, next) => {
 
   let projectsArr;
   let deleted = null;
-  if (req.query.first === 'true') {
+  if (firstTime === 'true') {
     projectsArr = utils.copyArrOfObjects(flhuntProjects.projects[arr]);
   } else {
     projectsArr = utils.diff(flhuntPrevProjects.projects[arr], flhuntProjects.projects[arr]);
@@ -562,20 +564,32 @@ exports.flhuntProjectsRead = async (req, res, next) => {
 };
 
 let timeout;
+let firstTimeReadProjects = true;
 exports.flhuntStart = async (req, res, next) => {
   canLoading = true;
-  let fileExists = utils.fileExists('../client/src/assets/flhuntProjects.json');
-  if (fileExists) {
-    let projects = JSON.parse(utils.readFileSync('../client/src/assets/flhuntProjects.json'));
-    if (projects.projects === undefined) {
-      res.json({ start: true, message: 'file is empty' });
+
+  if (firstTimeReadProjects) {
+    let fileExists = utils.fileExists('../client/src/assets/flhuntProjects.json');
+    if (fileExists) {
+      let projects = JSON.parse(utils.readFileSync('../client/src/assets/flhuntProjects.json'));
+      if (projects.projects === undefined) {
+        res.json({ start: true, message: 'file is empty' });
+      } else {
+        flhuntProjects = utils.deepCloneObject(projects);
+        flhuntPrevProjects = utils.deepCloneObject(projects);
+        res.json({ start: true });
+      }
     } else {
-      flhuntProjects = utils.deepCloneObject(projects);
-      flhuntPrevProjects = utils.deepCloneObject(projects);
-      res.json({ start: true });
+      res.json({ start: true, message: 'file not exists' });
     }
+    isLoading = true;
+    firstTimeReadProjects = false;
   } else {
-    res.json({ start: true, message: 'file not exists' });
+    if (isLoading) {
+      return res.json({ start: true });
+    }
+    isLoading = true;
+    res.json({ start: true });
   }
 
   const recursiveLoad = async () => {
@@ -613,6 +627,7 @@ exports.flhuntStart = async (req, res, next) => {
 // ? flhuntAbort********************************************************************************
 exports.flhuntAbort = async (req, res, next) => {
   clearTimeout(timeout);
+  isLoading = false;
   canLoading = false;
   await createNewNightmare({ aborted: true });
 

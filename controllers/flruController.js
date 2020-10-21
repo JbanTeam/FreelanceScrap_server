@@ -26,6 +26,7 @@ let flruPrevProjects = {
   date: 'none',
 };
 
+let isLoading = false;
 let canLoading;
 
 // ! ************************************************************************
@@ -292,14 +293,15 @@ exports.flruClickCheerio = async () => {
 // ? flruStart*************************************************************************
 exports.flruProjectsRead = async (req, res, next) => {
   if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(flruProjects.projects).length, date: flruProjects.date });
+  let firstTime = req.query.firstTime;
 
-  let cnt = req.query.cnt;
+  let cnt = +req.query.cnt;
   let length = Object.keys(flruProjects.projects).length;
   let arr = Object.keys(flruProjects.projects)[length - cnt];
 
   let projectsArr;
   let deleted = null;
-  if (req.query.first === 'true') {
+  if (firstTime === 'true') {
     projectsArr = utils.copyArrOfObjects(flruProjects.projects[arr]);
   } else {
     projectsArr = utils.diff(flruPrevProjects.projects[arr], flruProjects.projects[arr]);
@@ -314,20 +316,32 @@ exports.flruProjectsRead = async (req, res, next) => {
 };
 
 let timeout;
+let firstTimeReadProjects = true;
 exports.flruStart = async (req, res, next) => {
   canLoading = true;
-  let fileExists = utils.fileExists('../client/src/assets/flruProjects.json');
-  if (fileExists) {
-    let projects = JSON.parse(utils.readFileSync('../client/src/assets/flruProjects.json'));
-    if (projects.projects === undefined) {
-      res.json({ start: true, message: 'file is empty' });
+
+  if (firstTimeReadProjects) {
+    let fileExists = utils.fileExists('../client/src/assets/flruProjects.json');
+    if (fileExists) {
+      let projects = JSON.parse(utils.readFileSync('../client/src/assets/flruProjects.json'));
+      if (projects.projects === undefined) {
+        res.json({ start: true, message: 'file is empty' });
+      } else {
+        flruProjects = utils.deepCloneObject(projects);
+        flruPrevProjects = utils.deepCloneObject(projects);
+        res.json({ start: true });
+      }
     } else {
-      flruProjects = utils.deepCloneObject(projects);
-      flruPrevProjects = utils.deepCloneObject(projects);
-      res.json({ start: true });
+      res.json({ start: true, message: 'file not exists' });
     }
+    isLoading = true;
+    firstTimeReadProjects = false;
   } else {
-    res.json({ start: true, message: 'file not exists' });
+    if (isLoading) {
+      return res.json({ start: true });
+    }
+    isLoading = true;
+    res.json({ start: true });
   }
 
   const recursiveLoad = async () => {
@@ -350,6 +364,7 @@ exports.flruStart = async (req, res, next) => {
 // ? flruAbort********************************************************************************
 exports.flruAbort = async (req, res, next) => {
   clearTimeout(timeout);
+  isLoading = false;
   canLoading = false;
   await createNewNightmare({ aborted: true });
 

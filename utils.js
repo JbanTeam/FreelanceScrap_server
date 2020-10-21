@@ -47,6 +47,7 @@ function diff(prevArr, newArr) {
   });
 }
 
+// фильтрует удаленные объекты, возвращает массив ссылок удаленных объектов
 function diff2(prevArr, newArr) {
   let arr = [];
   let arr2 = [];
@@ -88,7 +89,12 @@ function deepCloneObject(obj) {
   return clObj;
 }
 
+function getKeyByValue(object, value) {
+  return Object.keys(object).find((key) => object[key] === value);
+}
+
 module.exports = {
+  getKeyByValue,
   diff,
   diff2,
   copyArrOfObjects,

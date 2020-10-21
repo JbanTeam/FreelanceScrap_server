@@ -26,6 +26,7 @@ let freelanceruPrevProjects = {
   date: 'none',
 };
 
+let isLoading = false;
 let canLoading;
 
 // ! *********************************************************************************
@@ -179,14 +180,15 @@ exports.freelanceruLinksCheerio = async (req, res, next) => {
 // ? freelanceruStart*******************************************************************************************
 exports.freelanceruProjectsRead = async (req, res, next) => {
   if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(freelanceruProjects.projects).length, date: freelanceruProjects.date });
+  let firstTime = req.query.firstTime;
 
-  let cnt = req.query.cnt;
+  let cnt = +req.query.cnt;
   let length = Object.keys(freelanceruProjects.projects).length;
   let arr = Object.keys(freelanceruProjects.projects)[length - cnt];
 
   let projectsArr;
   let deleted = null;
-  if (req.query.first === 'true') {
+  if (firstTime === 'true') {
     projectsArr = utils.copyArrOfObjects(freelanceruProjects.projects[arr]);
   } else {
     projectsArr = utils.diff(freelanceruPrevProjects.projects[arr], freelanceruProjects.projects[arr]);
@@ -201,20 +203,32 @@ exports.freelanceruProjectsRead = async (req, res, next) => {
 };
 
 let timeout;
+let firstTimeReadProjects = true;
 exports.freelanceruStart = async (req, res, next) => {
   canLoading = true;
-  let fileExists = utils.fileExists('../client/src/assets/freelanceruProjects.json');
-  if (fileExists) {
-    let projects = JSON.parse(utils.readFileSync('../client/src/assets/freelanceruProjects.json'));
-    if (projects.projects === undefined) {
-      res.json({ start: true, message: 'file is empty' });
+
+  if (firstTimeReadProjects) {
+    let fileExists = utils.fileExists('../client/src/assets/freelanceruProjects.json');
+    if (fileExists) {
+      let projects = JSON.parse(utils.readFileSync('../client/src/assets/freelanceruProjects.json'));
+      if (projects.projects === undefined) {
+        res.json({ start: true, message: 'file is empty' });
+      } else {
+        freelanceruProjects = utils.deepCloneObject(projects);
+        freelanceruPrevProjects = utils.deepCloneObject(projects);
+        res.json({ start: true });
+      }
     } else {
-      freelanceruProjects = utils.deepCloneObject(projects);
-      freelanceruPrevProjects = utils.deepCloneObject(projects);
-      res.json({ start: true });
+      res.json({ start: true, message: 'file not exists' });
     }
+    isLoading = true;
+    firstTimeReadProjects = false;
   } else {
-    res.json({ start: true, message: 'file not exists' });
+    if (isLoading) {
+      return res.json({ start: true });
+    }
+    isLoading = true;
+    res.json({ start: true });
   }
 
   const recursiveLoad = async () => {
@@ -237,6 +251,7 @@ exports.freelanceruStart = async (req, res, next) => {
 // ? freelanceruAbort********************************************************************************
 exports.freelanceruAbort = async (req, res, next) => {
   clearTimeout(timeout);
+  isLoading = false;
   canLoading = false;
   await createNewNightmare({ aborted: true });
 

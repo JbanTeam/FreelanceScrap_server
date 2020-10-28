@@ -590,7 +590,13 @@ exports.weblancerProjectsRead = async (req, res, next) => {
 
   let projectsArr;
   let deleted = null;
+  // TODO: create newProjects obj
   if (firstTime === 'true') {
+    // if(newProjects.length) {
+    //   projectsArr = utils.copyArrOfObjects(newProjects[arr]);
+    // } else {
+    //   projectsArr = utils.copyArrOfObjects(weblancerProjects.projects[arr]);
+    // }
     projectsArr = utils.copyArrOfObjects(weblancerProjects.projects[arr]);
   } else {
     projectsArr = utils.diff(weblancerPrevProjects.projects[arr], weblancerProjects.projects[arr]);
@@ -608,8 +614,6 @@ let timeout;
 let firstTimeReadProjects = true;
 exports.weblancerStart = async (req, res, next) => {
   canLoading = true;
-
-  // console.log('first', firstTimeReadProjects, 'isLoading', isLoading);
   if (firstTimeReadProjects) {
     let fileExists = utils.fileExists('../client/src/assets/weblancerProjects.json');
     if (fileExists) {

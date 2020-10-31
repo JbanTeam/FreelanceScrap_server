@@ -28,6 +28,7 @@ let weblancerPrevProjects = {
   date: 'none',
 };
 
+let newProjectsCleaned = false;
 let isLoading = false;
 let canLoading;
 
@@ -164,11 +165,12 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
       $ = cheerio.load(data, { normalizeWhitespace: true, decodeEntities: false });
 
       // собираем проекты с первой страницы, мы на ней находимся
+      let section = categoryLinks[i].title;
       try {
         resultProjects = [...resultProjects, ...(await weblancerScrapLinksCheerio($, url))];
       } catch (error) {
-        await createNewNightmare({ msg: `weblancer 1 page of ${categoryLinks[i]} parse error`, error });
-        // return res.json({ error: true, message: `weblancer 1 page of ${categoryLinks[i]} parse error` });
+        await createNewNightmare({ msg: `weblancer 1 page of ${section} parse error`, error });
+        // return res.json({ error: true, message: `weblancer 1 page of ${section} parse error` });
       }
 
       // пробегаемся по оставшимся страницам и собираем проекты
@@ -176,8 +178,10 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
       let isNextExists = !!$('.pagination_box').length;
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
-        console.log(`weblancer ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
-        weblancerProjects.projects[categoryLinks[i].title] = resultProjects;
+        console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
+        weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
+        weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+        weblancerProjects.projects[section] = resultProjects;
         resultProjects = [];
         continue;
       }
@@ -205,13 +209,15 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
         try {
           resultProjects = [...resultProjects, ...(await weblancerScrapLinksCheerio($, url))];
         } catch (error) {
-          await createNewNightmare({ msg: `weblancer ${nextLink} of ${categoryLinks[i]} parse error`, error });
-          // return res.json({ error: true, message: `weblancer ${nextLink} of ${categoryLinks[i]} parse error` });
+          await createNewNightmare({ msg: `weblancer ${nextLink} of ${section} parse error`, error });
+          // return res.json({ error: true, message: `weblancer ${nextLink} of ${section} parse error` });
         }
       }
 
-      console.log(`weblancer ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
-      weblancerProjects.projects[categoryLinks[i].title] = resultProjects;
+      console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
+      weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
+      weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+      weblancerProjects.projects[section] = resultProjects;
       resultProjects = [];
     }
   } catch (error) {
@@ -220,7 +226,7 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
   }
 
   weblancerProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
-  await createNewNightmare();
+  await createNewNightmare({});
   utils.writeFileSync('../client/src/assets/weblancerProjects.json', JSON.stringify(weblancerProjects));
   // res.status(200).json(weblancerProjects);
 };
@@ -299,6 +305,8 @@ async function weblancerScrapClick(section) {
 
   // console.dir(resultProjects, { depth: null });
   console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
+  weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
+  weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
   weblancerProjects.projects[section] = resultProjects;
   // console.log(weblancerProjects);
 }
@@ -389,7 +397,7 @@ exports.weblancerClick = async (req, res, next) => {
   }
 
   weblancerProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
-  await createNewNightmare();
+  await createNewNightmare({});
   utils.writeFileSync('../client/src/assets/weblancerProjects.json', JSON.stringify(weblancerProjects));
   // res.status(200).json(weblancerProjects);
 };
@@ -456,32 +464,6 @@ async function weblancerScrapCheerio($cheerio, url) {
 
   return projects;
 }
-// let firstTime = true;
-// exports.weblancerCheerio = async (req, res, next) => {
-//   if (!firstTime) {
-//     weblancerProjects.projects.webprog.push({
-//       fixed: true,
-//       link: `https://www.weblancer.net/vacancies/veb-programmirovanie-31/php-razrabotchik-${Math.random() * 6000}/`,
-//       title: `PHP-разработчик`,
-//       skills: `Веб-программирование, Вакансия`,
-//       description: `${Math.random() * 1000000}`,
-//       bets: `${Math.random() * 20} заявок`,
-//       time: '27.09.2020 в 23:19/17 часов назад',
-//       published: '1601237965',
-//     });
-//     weblancerProjects.projects.html.push({
-//       fixed: true,
-//       link: `https://www.weblancer.net/vacancies/veb-programmirovanie-31/php-razrabotchik-${Math.random() * 6000}/`,
-//       title: `PHP-разработчик`,
-//       skills: `Веб-программирование, Вакансия`,
-//       description: `${Math.random() * 1000000}`,
-//       bets: `${Math.random() * 20} заявок`,
-//       time: '27.09.2020 в 23:19/17 часов назад',
-//       published: '1601237965',
-//     });
-//   }
-//   firstTime = false;
-// };
 exports.weblancerCheerio = async (req, res, next) => {
   let resultProjects = [];
 
@@ -514,6 +496,7 @@ exports.weblancerCheerio = async (req, res, next) => {
     if (!canLoading) {
       return;
     }
+    // TODO: fetch try/catch
     let response = await fetch(categoryLinks[i].link);
     response = await response.buffer();
     let data = iconv.decode(response, 'cp1251').toString();
@@ -522,11 +505,12 @@ exports.weblancerCheerio = async (req, res, next) => {
     $ = cheerio.load(data, { normalizeWhitespace: true, decodeEntities: false });
 
     // собираем проекты с первой страницы, мы на ней находимся
+    let section = categoryLinks[i].title;
     try {
       resultProjects = [...resultProjects, ...(await weblancerScrapCheerio($, url))];
     } catch (error) {
-      console.log('message', `weblancer 1 page of ${categoryLinks[i]} parse error`, 'err', error);
-      // return res.json({ error: true, message: `weblancer 1 page of ${categoryLinks[i]} parse error` });
+      console.log('message', `weblancer 1 page of ${section} parse error`, 'err', error);
+      // return res.json({ error: true, message: `weblancer 1 page of ${section} parse error` });
     }
 
     // пробегаемся по оставшимся страницам и собираем проекты
@@ -534,8 +518,10 @@ exports.weblancerCheerio = async (req, res, next) => {
     let isNextExists = !!$('.pagination_box').length;
     if (!isNextExists) {
       console.log('next disabled', true, 'next exists', isNextExists);
-      console.log(`weblancer ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
-      weblancerProjects.projects[categoryLinks[i].title] = resultProjects;
+      console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
+      weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
+      weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+      weblancerProjects.projects[section] = resultProjects;
       resultProjects = [];
       continue;
     }
@@ -553,8 +539,8 @@ exports.weblancerCheerio = async (req, res, next) => {
       console.log(nextLink);
 
       if (isNextExists && !isNextDisabled) {
-        // ждем 1 сек чтобы не спамить запросами слишком быстро
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // ждем чтобы не спамить запросами слишком быстро
+        await new Promise((resolve) => setTimeout(resolve, 1500));
 
         let response = await fetch(nextLink);
         response = await response.buffer();
@@ -565,49 +551,45 @@ exports.weblancerCheerio = async (req, res, next) => {
       try {
         resultProjects = [...resultProjects, ...(await weblancerScrapCheerio($, url))];
       } catch (error) {
-        console.log('message', `weblancer ${nextLink} of ${categoryLinks[i]} parse error`, 'err', error);
-        // return res.json({ error: true, message: `weblancer ${nextLink} of ${categoryLinks[i]} parse error` });
+        console.log('message', `weblancer ${nextLink} of ${section} parse error`, 'err', error);
+        // return res.json({ error: true, message: `weblancer ${nextLink} of ${section} parse error` });
       }
     }
 
-    console.log(`weblancer ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
-    weblancerProjects.projects[categoryLinks[i].title] = resultProjects;
+    console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
+    weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
+    weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+    weblancerProjects.projects[section] = resultProjects;
     resultProjects = [];
   }
   weblancerProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
-  utils.writeFileSync('../client/src/assets/weblancerProjects.json', JSON.stringify(weblancerProjects));
+  // utils.writeFileSync('../client/src/assets/weblancerProjects.json', JSON.stringify(weblancerProjects));
   // res.status(200).json(weblancerProjects);
 };
 
 // ? weblancerStart********************************************************************************
 exports.weblancerProjectsRead = async (req, res, next) => {
-  if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(weblancerProjects.projects).length, date: weblancerProjects.date });
+  if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(weblancerPrevProjects.projects).length, date: weblancerPrevProjects.date });
   let firstTime = req.query.firstTime;
 
   let cnt = +req.query.cnt;
-  let length = Object.keys(weblancerProjects.projects).length;
-  let arr = Object.keys(weblancerProjects.projects)[length - cnt];
+  let length = Object.keys(weblancerPrevProjects.projects).length;
+  let arr = Object.keys(weblancerPrevProjects.projects)[length - cnt];
 
   let projectsArr;
   let deleted = null;
-  // TODO: create newProjects obj
   if (firstTime === 'true') {
-    // if(newProjects.length) {
-    //   projectsArr = utils.copyArrOfObjects(newProjects[arr]);
-    // } else {
-    //   projectsArr = utils.copyArrOfObjects(weblancerProjects.projects[arr]);
-    // }
-    projectsArr = utils.copyArrOfObjects(weblancerProjects.projects[arr]);
+    // TODO: if newProjects.len, res newProjects
+    projectsArr = weblancerPrevProjects.projects[arr];
   } else {
-    projectsArr = utils.diff(weblancerPrevProjects.projects[arr], weblancerProjects.projects[arr]);
-    deleted = utils.diff2(weblancerProjects.projects[arr], weblancerPrevProjects.projects[arr]);
+    projectsArr = weblancerPrevProjects.newProjects[arr];
+    deleted = weblancerPrevProjects.deleted[arr];
+    if (projectsArr.length) newProjectsCleaned = false;
     console.log('projects', projectsArr.length);
     console.log('deleted', deleted.length);
-
-    if (projectsArr.length || deleted.length) weblancerPrevProjects.projects[arr] = utils.copyArrOfObjects(weblancerProjects.projects[arr]);
   }
 
-  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted });
+  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjectsCleaned });
 };
 
 let timeout;
@@ -621,8 +603,13 @@ exports.weblancerStart = async (req, res, next) => {
       if (projects.projects === undefined) {
         res.json({ start: true, message: 'file is empty' });
       } else {
-        weblancerProjects = utils.deepCloneObject(projects);
         weblancerPrevProjects = utils.deepCloneObject(projects);
+        weblancerPrevProjects.newProjects = {};
+        weblancerPrevProjects.deleted = {};
+        Object.keys(weblancerPrevProjects.projects).forEach((proj) => {
+          weblancerPrevProjects.newProjects[proj] = [];
+          weblancerPrevProjects.deleted[proj] = [];
+        });
         res.json({ start: true });
       }
     } else {
@@ -637,6 +624,8 @@ exports.weblancerStart = async (req, res, next) => {
     isLoading = true;
     res.json({ start: true });
   }
+
+  let cnt = 0;
 
   const recursiveLoad = async () => {
     console.log('weblancer start load'.bgYellow);
@@ -658,9 +647,13 @@ exports.weblancerStart = async (req, res, next) => {
     try {
       await loadFunction().then(() => {
         if (!canLoading) return;
-
+        cnt++;
+        if (cnt > 1) {
+          cnt = 0;
+          mergeProjects();
+        }
         console.log('weblancer end load'.bgMagenta);
-        timeout = setTimeout(recursiveLoad, 60000 * 5);
+        timeout = setTimeout(recursiveLoad, 20000);
       });
     } catch (error) {
       clearTimeout(timeout);
@@ -668,6 +661,24 @@ exports.weblancerStart = async (req, res, next) => {
   };
 
   recursiveLoad();
+};
+
+const mergeProjects = () => {
+  Object.keys(weblancerPrevProjects.newProjects).forEach((proj) => {
+    while (weblancerPrevProjects.newProjects[proj].length) {
+      weblancerPrevProjects.newProjects[proj].pop();
+    }
+  });
+  Object.keys(weblancerPrevProjects.deleted).forEach((proj) => {
+    while (weblancerPrevProjects.deleted[proj].length) {
+      weblancerPrevProjects.deleted[proj].pop();
+    }
+  });
+
+  weblancerPrevProjects.date = weblancerProjects.date;
+  weblancerPrevProjects.projects = utils.deepCloneObject(weblancerProjects.projects);
+
+  newProjectsCleaned = true;
 };
 
 // ? weblancerAbort********************************************************************************

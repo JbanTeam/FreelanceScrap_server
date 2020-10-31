@@ -22,22 +22,27 @@ let allProjects = {
   weblancerProjects: {
     projects: {},
     newProjects: {},
+    newProjectsAll: {},
   },
   flhuntProjects: {
     projects: {},
     newProjects: {},
+    newProjectsAll: {},
   },
   flhabrProjects: {
     projects: {},
     newProjects: {},
+    newProjectsAll: {},
   },
   freelanceruProjects: {
     projects: {},
     newProjects: {},
+    newProjectsAll: {},
   },
   flruProjects: {
     projects: {},
     newProjects: {},
+    newProjectsAll: {},
   },
 };
 
@@ -170,22 +175,40 @@ const setProjects = (flLower, arrName, projects) => {
   allProjects[`${flLower}Projects`].projects[arrName] = projects.map((obj) => Object.assign({}, obj));
 };
 
-const addNewProjects = (flLower, arrName, projects) => {
-  // console.log('projects', projects.length);
+const addNewProjects = (flLower, arrName, projects, deleted) => {
+  let newExists = false;
+  if (projects.length) {
+    let newProjects = allProjects[`${flLower}Projects`].newProjects;
+    let newProjectsAll = allProjects[`${flLower}Projects`].newProjectsAll;
 
+    if (newProjects[arrName] === undefined) {
+      newProjects[arrName] = projects.map((proj) => Object.assign({}, proj));
+      newProjectsAll[arrName] = projects.map((proj) => proj.link);
+      newExists = true;
+    } else {
+      projects = projects.filter((proj) => newProjectsAll[arrName].indexOf(proj.link) === -1);
+      if (projects.length) {
+        newProjectsAll[arrName] = [...projects.map((proj) => proj.link), ...newProjectsAll[arrName]];
+        newProjects[arrName] = [...projects.map((obj) => Object.assign({}, obj)), ...newProjects[arrName].map((obj) => Object.assign({}, obj))];
+        newExists = true;
+      }
+    }
+  }
+  addToProjects(flLower, arrName, projects, deleted);
+
+  return newExists;
+};
+
+const resetNewProjectsAll = (flLower, arrName) => {
   let newProjects = allProjects[`${flLower}Projects`].newProjects;
+  let newProjectsAll = allProjects[`${flLower}Projects`].newProjectsAll;
 
-  if (newProjects[arrName] === undefined) {
-    newProjects[arrName] = projects.map((proj) => Object.assign({}, proj));
-  } else {
-    newProjects[arrName] = [...newProjects[proj].map((obj) => Object.assign({}, obj)), ...projects[proj].map((obj) => Object.assign({}, obj))];
+  if (newProjects[arrName] !== undefined) {
+    newProjects[arrName].length ? (newProjectsAll[arrName] = newProjects[arrName].map((proj) => proj.link)) : (newProjectsAll[arrName] = []);
   }
 };
 
 const addToProjects = (flLower, arrName, projects, deleted) => {
-  // console.log('projects', projects.length);
-  // console.log('deleted', deleted.length);
-
   if (deleted.length) {
     allProjects[`${flLower}Projects`].projects[arrName] = allProjects[`${flLower}Projects`].projects[arrName].filter((proj) => {
       return deleted.indexOf(proj.link) === -1;
@@ -244,10 +267,11 @@ const projectsRead = async (ctx, fl, flLower, firstTime) => {
     if (firstTime) {
       setProjects(flLower, arrName, projects.data[arrName]);
     } else {
-      if (projects.data[arrName].length) newExists = true;
       if (projects.data[arrName].length || projects.data.deleted.length) {
-        addNewProjects(flLower, arrName, projects.data[arrName]);
-        addToProjects(flLower, arrName, projects.data[arrName], projects.data.deleted);
+        let res = addNewProjects(flLower, arrName, projects.data[arrName], projects.data.deleted);
+        if (!newExists) newExists = res;
+      } else {
+        if (projects.data.newProjectsCleaned) resetNewProjectsAll(flLower, arrName);
       }
     }
   }
@@ -302,18 +326,18 @@ const freelanceBtnClick = async (ctx, fl, isLoading) => {
       await projectsRead(ctx, fl, flLower, firstLoad);
       firstLoad = false;
     }
+  } else {
+    curScene.val = flLower;
+
+    await ctx.scene.enter(`freelance`, {
+      fl,
+      allProjects: allProjects[`${flLower}Projects`],
+      sections: freelanceArr[fl].sec,
+      curScene,
+      eventEmitter,
+    });
+    await ctx.answerCbQuery(`You are in ${flLower.toUpperCase()} scene.`);
   }
-
-  curScene.val = flLower;
-
-  await ctx.scene.enter(`freelance`, {
-    fl,
-    allProjects: allProjects[`${flLower}Projects`],
-    sections: freelanceArr[fl].sec,
-    curScene,
-    eventEmitter,
-  });
-  await ctx.answerCbQuery(`You are in ${flLower.toUpperCase()} scene.`);
 };
 
 // ? listeners****************************************************

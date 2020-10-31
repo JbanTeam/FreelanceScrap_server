@@ -26,6 +26,7 @@ let flhuntPrevProjects = {
   date: 'none',
 };
 
+let newProjectsCleaned = false;
 let isLoading = false;
 let canLoading;
 
@@ -160,11 +161,12 @@ exports.flhuntLinksCheerio = async (req, res, next) => {
       $ = cheerio.load(data, { normalizeWhitespace: true, decodeEntities: false });
 
       // собираем проекты с первой страницы, мы на ней находимся
+      let section = categoryLinks[i].title;
       try {
         resultProjects = [...resultProjects, ...(await flhuntScrapLinksCheerio($, url))];
       } catch (error) {
-        await createNewNightmare({ msg: `flhunt 1 page of ${categoryLinks[i]} parse error`, error });
-        // return res.json({ error: true, message: `flhunt 1 page of ${categoryLinks[i]} parse error` });
+        await createNewNightmare({ msg: `flhunt 1 page of ${section} parse error`, error });
+        // return res.json({ error: true, message: `flhunt 1 page of ${section} parse error` });
       }
 
       // пробегаемся по оставшимся страницам и собираем проекты
@@ -172,8 +174,10 @@ exports.flhuntLinksCheerio = async (req, res, next) => {
       let isNextExists = $('.pagination li').length > 0;
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
-        console.log(`flhunt ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
-        flhuntProjects.projects[categoryLinks[i].title] = resultProjects;
+        console.log(`flhunt ${section} - ${resultProjects.length}`.bgGreen);
+        flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
+        flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+        flhuntProjects.projects[section] = resultProjects;
         resultProjects = [];
         continue;
       }
@@ -200,13 +204,15 @@ exports.flhuntLinksCheerio = async (req, res, next) => {
         try {
           resultProjects = [...resultProjects, ...(await flhuntScrapLinksCheerio($, url))];
         } catch (error) {
-          await createNewNightmare({ msg: `flhunt ${nextLink} of ${categoryLinks[i]} parse error`, error });
-          // return res.json({ error: true, message: `flhunt ${nextLink} of ${categoryLinks[i]} parse error` });
+          await createNewNightmare({ msg: `flhunt ${nextLink} of ${section} parse error`, error });
+          // return res.json({ error: true, message: `flhunt ${nextLink} of ${section} parse error` });
         }
       }
 
       console.log(`flhunt ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
-      flhuntProjects.projects[categoryLinks[i].title] = resultProjects;
+      flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
+      flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+      flhuntProjects.projects[section] = resultProjects;
       resultProjects = [];
     }
   } catch (error) {
@@ -215,8 +221,8 @@ exports.flhuntLinksCheerio = async (req, res, next) => {
   }
 
   flhuntProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
-  await createNewNightmare();
-  utils.writeFileSync('../client/src/assets/flhuntProjects.json', JSON.stringify(flhuntProjects));
+  await createNewNightmare({});
+  // utils.writeFileSync('../client/src/assets/flhuntProjects.json', JSON.stringify(flhuntProjects));
   // res.status(200).json(flhuntProjects);
 };
 // ? flhuntLinks********************************************************************************
@@ -304,6 +310,7 @@ exports.flhuntLinks = async (req, res, next) => {
     console.log(categoryLinks);
 
     // пробегаемся по всем страницам раздела
+    let section = categoryLinks[i].title;
     for (let i = 0; i < categoryLinks.length; i++) {
       if (!canLoading) return;
 
@@ -313,8 +320,8 @@ exports.flhuntLinks = async (req, res, next) => {
       try {
         resultProjects = [...resultProjects, ...(await flhuntScrapLinks())];
       } catch (error) {
-        await createNewNightmare({ msg: `flhunt 1 page of ${categoryLinks[i]} parse error`, error });
-        // return res.json({ error: true, message: `flhunt 1 page of ${categoryLinks[i]} parse error` });
+        await createNewNightmare({ msg: `flhunt 1 page of ${section} parse error`, error });
+        // return res.json({ error: true, message: `flhunt 1 page of ${section} parse error` });
       }
 
       // пробегаемся по оставшимся страницам и собираем проекты
@@ -322,8 +329,10 @@ exports.flhuntLinks = async (req, res, next) => {
       let isNextExists = await nightmare.exists('.pagination li');
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
-        console.log(`flhunt ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
-        flhuntProjects.projects[categoryLinks[i].title] = resultProjects;
+        console.log(`flhunt ${section} - ${resultProjects.length}`.bgGreen);
+        flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
+        flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+        flhuntProjects.projects[section] = resultProjects;
         resultProjects = [];
         continue;
       }
@@ -347,13 +356,15 @@ exports.flhuntLinks = async (req, res, next) => {
         try {
           resultProjects = [...resultProjects, ...(await flhuntScrapLinks())];
         } catch (error) {
-          await createNewNightmare({ msg: `flhunt ${nextLink} of ${categoryLinks[i]} parse error`, error });
-          // return res.json({ error: true, message: `flhunt ${nextLink} of ${categoryLinks[i]} parse error` });
+          await createNewNightmare({ msg: `flhunt ${nextLink} of ${section} parse error`, error });
+          // return res.json({ error: true, message: `flhunt ${nextLink} of ${section} parse error` });
         }
       }
 
-      console.log(`flhunt ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
-      flhuntProjects.projects[categoryLinks[i].title] = resultProjects;
+      console.log(`flhunt ${section} - ${resultProjects.length}`.bgGreen);
+      flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
+      flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+      flhuntProjects.projects[section] = resultProjects;
       resultProjects = [];
     }
   } catch (error) {
@@ -362,7 +373,7 @@ exports.flhuntLinks = async (req, res, next) => {
   }
 
   flhuntProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
-  await createNewNightmare();
+  await createNewNightmare({});
   utils.writeFileSync('../client/src/assets/flhuntProjects.json', JSON.stringify(flhuntProjects));
   // res.status(200).json(flhuntProjects);
 };
@@ -434,6 +445,8 @@ async function flhuntScrapClick(section) {
 
   // console.dir(resultProjects, { depth: null });
   console.log(`flhunt ${section} - ${resultProjects.length}`.bgGreen);
+  flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
+  flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
   flhuntProjects.projects[section] = resultProjects;
   // console.log(flhuntProjects);
 }
@@ -450,14 +463,14 @@ exports.flhuntClick = async (req, res, next) => {
       .click('.panel-group .panel:nth-child(3) ul.panel-body li:first-child a');
   } catch (error) {
     await createNewNightmare({ msg: 'flhunt html section goto error', error });
-    // return res.json({ error: true, message: 'weblancer html section goto error' });
+    // return res.json({ error: true, message: 'flhunt html section goto error' });
   }
 
   try {
     await flhuntScrapClick('html');
   } catch (error) {
-    await createNewNightmare({ msg: 'weblancer html section parse error', error });
-    // return res.json({ error: true, message: 'weblancer html section parse error' });
+    await createNewNightmare({ msg: 'flhunt html section parse error', error });
+    // return res.json({ error: true, message: 'flhunt html section parse error' });
   }
 
   // идем в раздел javascript
@@ -468,14 +481,14 @@ exports.flhuntClick = async (req, res, next) => {
       .wait('.panel-group .panel:nth-child(1) ul.panel-body')
       .click('.panel-group .panel:nth-child(1) ul.panel-body li:nth-child(8) a');
   } catch (error) {
-    await createNewNightmare({ msg: 'weblancer javascript section goto error', error });
-    // return res.json({ error: true, message: 'weblancer javascript section goto error' });
+    await createNewNightmare({ msg: 'flhunt javascript section goto error', error });
+    // return res.json({ error: true, message: 'flhunt javascript section goto error' });
   }
   try {
     await flhuntScrapClick('javascript');
   } catch (error) {
-    await createNewNightmare({ msg: 'weblancer javascript section parse error', error });
-    // return res.json({ error: true, message: 'weblancer javascript section parse error' });
+    await createNewNightmare({ msg: 'flhunt javascript section parse error', error });
+    // return res.json({ error: true, message: 'flhunt javascript section parse error' });
   }
 
   // идем в раздел nodejs
@@ -486,14 +499,14 @@ exports.flhuntClick = async (req, res, next) => {
       .wait('.panel-group .panel:nth-child(1) ul.panel-body')
       .click('.panel-group .panel:nth-child(1) ul.panel-body li:nth-child(11) a');
   } catch (error) {
-    await createNewNightmare({ msg: 'weblancer nodejs section goto error', error });
-    // return res.json({ error: true, message: 'weblancer nodejs section goto error' });
+    await createNewNightmare({ msg: 'flhunt nodejs section goto error', error });
+    // return res.json({ error: true, message: 'flhunt nodejs section goto error' });
   }
   try {
     await flhuntScrapClick('nodejs');
   } catch (error) {
-    await createNewNightmare({ msg: 'weblancer nodejs section parse error', error });
-    // return res.json({ error: true, message: 'weblancer nodejs section parse error' });
+    await createNewNightmare({ msg: 'flhunt nodejs section parse error', error });
+    // return res.json({ error: true, message: 'flhunt nodejs section parse error' });
   }
 
   // идем в раздел web-programming
@@ -504,14 +517,14 @@ exports.flhuntClick = async (req, res, next) => {
       .wait('.panel-group .panel:nth-child(1) ul.panel-body')
       .click('.panel-group .panel:nth-child(1) ul.panel-body li:nth-child(17) a');
   } catch (error) {
-    await createNewNightmare({ msg: 'weblancer webprog section goto error', error });
-    // return res.json({ error: true, message: 'weblancer webprog section goto error' });
+    await createNewNightmare({ msg: 'flhunt webprog section goto error', error });
+    // return res.json({ error: true, message: 'flhunt webprog section goto error' });
   }
   try {
     await flhuntScrapClick('webprog');
   } catch (error) {
-    await createNewNightmare({ msg: 'weblancer webprog section parse error', error });
-    // return res.json({ error: true, message: 'weblancer webprog section parse error' });
+    await createNewNightmare({ msg: 'flhunt webprog section parse error', error });
+    // return res.json({ error: true, message: 'flhunt webprog section parse error' });
   }
 
   // идем в раздел parsing
@@ -522,45 +535,44 @@ exports.flhuntClick = async (req, res, next) => {
       .wait('.panel-group .panel:nth-child(1) ul.panel-body')
       .click('.panel-group .panel:nth-child(1) ul.panel-body li:nth-child(21) a');
   } catch (error) {
-    await createNewNightmare({ msg: 'weblancer parsing section goto error', error });
-    // return res.json({ error: true, message: 'weblancer parsing section goto error' });
+    await createNewNightmare({ msg: 'flhunt parsing section goto error', error });
+    // return res.json({ error: true, message: 'flhunt parsing section goto error' });
   }
   try {
     await flhuntScrapClick('parsing');
   } catch (error) {
-    await createNewNightmare({ msg: 'weblancer parsing section parse error', error });
-    // return res.json({ error: true, message: 'weblancer parsing section parse error' });
+    await createNewNightmare({ msg: 'flhunt parsing section parse error', error });
+    // return res.json({ error: true, message: 'flhunt parsing section parse error' });
   }
 
   flhuntProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
-  await createNewNightmare();
+  await createNewNightmare({});
   utils.writeFileSync('../client/src/assets/flhuntProjects.json', JSON.stringify(flhuntProjects));
   // res.status(200).json(flhuntProjects);
 };
 
 // ? flhuntStart**************************************************************************
 exports.flhuntProjectsRead = async (req, res, next) => {
-  if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(flhuntProjects.projects).length, date: flhuntProjects.date });
+  if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(flhuntPrevProjects.projects).length, date: flhuntPrevProjects.date });
   let firstTime = req.query.firstTime;
 
   let cnt = req.query.cnt;
-  let length = Object.keys(flhuntProjects.projects).length;
-  let arr = Object.keys(flhuntProjects.projects)[length - cnt];
+  let length = Object.keys(flhuntPrevProjects.projects).length;
+  let arr = Object.keys(flhuntPrevProjects.projects)[length - cnt];
 
   let projectsArr;
   let deleted = null;
   if (firstTime === 'true') {
-    projectsArr = utils.copyArrOfObjects(flhuntProjects.projects[arr]);
+    projectsArr = flhuntPrevProjects.projects[arr];
   } else {
-    projectsArr = utils.diff(flhuntPrevProjects.projects[arr], flhuntProjects.projects[arr]);
-    deleted = utils.diff2(flhuntProjects.projects[arr], flhuntPrevProjects.projects[arr]);
+    projectsArr = flhuntPrevProjects.newProjects[arr];
+    deleted = flhuntPrevProjects.deleted[arr];
+    if (projectsArr.length) newProjectsCleaned = false;
     console.log('projects', projectsArr.length);
     console.log('deleted', deleted.length);
-
-    if (projectsArr.length || deleted.length) flhuntPrevProjects.projects[arr] = utils.copyArrOfObjects(flhuntProjects.projects[arr]);
   }
 
-  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted });
+  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjectsCleaned });
 };
 
 let timeout;
@@ -575,8 +587,13 @@ exports.flhuntStart = async (req, res, next) => {
       if (projects.projects === undefined) {
         res.json({ start: true, message: 'file is empty' });
       } else {
-        flhuntProjects = utils.deepCloneObject(projects);
         flhuntPrevProjects = utils.deepCloneObject(projects);
+        flhuntPrevProjects.newProjects = {};
+        flhuntPrevProjects.deleted = {};
+        Object.keys(flhuntPrevProjects.projects).forEach((proj) => {
+          flhuntPrevProjects.newProjects[proj] = [];
+          flhuntPrevProjects.deleted[proj] = [];
+        });
         res.json({ start: true });
       }
     } else {
@@ -591,6 +608,8 @@ exports.flhuntStart = async (req, res, next) => {
     isLoading = true;
     res.json({ start: true });
   }
+
+  let cnt = 0;
 
   const recursiveLoad = async () => {
     console.log('flhunt start load'.bgYellow);
@@ -612,7 +631,11 @@ exports.flhuntStart = async (req, res, next) => {
     try {
       await loadFunction().then(() => {
         if (!canLoading) return;
-
+        cnt++;
+        if (cnt > 1) {
+          cnt = 0;
+          mergeProjects();
+        }
         console.log('flhunt end load'.bgMagenta);
         timeout = setTimeout(recursiveLoad, 60000 * 5);
       });
@@ -624,6 +647,23 @@ exports.flhuntStart = async (req, res, next) => {
   recursiveLoad();
 };
 
+const mergeProjects = () => {
+  Object.keys(flhuntPrevProjects.newProjects).forEach((proj) => {
+    while (flhuntPrevProjects.newProjects[proj].length) {
+      flhuntPrevProjects.newProjects[proj].pop();
+    }
+  });
+  Object.keys(flhuntPrevProjects.deleted).forEach((proj) => {
+    while (flhuntPrevProjects.deleted[proj].length) {
+      flhuntPrevProjects.deleted[proj].pop();
+    }
+  });
+
+  flhuntPrevProjects.date = flhuntProjects.date;
+  flhuntPrevProjects.projects = utils.deepCloneObject(flhuntProjects.projects);
+
+  newProjectsCleaned = true;
+};
 // ? flhuntAbort********************************************************************************
 exports.flhuntAbort = async (req, res, next) => {
   clearTimeout(timeout);

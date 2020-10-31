@@ -26,6 +26,7 @@ let flruPrevProjects = {
   date: 'none',
 };
 
+let newProjectsCleaned = false;
 let isLoading = false;
 let canLoading;
 
@@ -124,6 +125,8 @@ async function flruScrapClickCheerio(section, url) {
   if (!isNextExists) {
     console.log('next disabled', true, 'next exists', isNextExists);
     console.log(`flru ${section} - ${resultProjects.length}`.bgGreen);
+    flruPrevProjects.newProjects[section] = utils.diff(flruPrevProjects.projects[section], resultProjects);
+    flruPrevProjects.deleted[section] = utils.diff2(resultProjects, flruPrevProjects.projects[section]);
     flruProjects.projects[section] = resultProjects;
   }
 
@@ -159,6 +162,8 @@ async function flruScrapClickCheerio(section, url) {
   }
 
   console.log(`flru ${section} - ${resultProjects.length}`.bgGreen);
+  flruPrevProjects.newProjects[section] = utils.diff(flruPrevProjects.projects[section], resultProjects);
+  flruPrevProjects.deleted[section] = utils.diff2(resultProjects, flruPrevProjects.projects[section]);
   flruProjects.projects[section] = resultProjects;
 }
 
@@ -286,33 +291,32 @@ exports.flruClickCheerio = async () => {
   }
 
   flruProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
-  await createNewNightmare();
-  utils.writeFileSync('../client/src/assets/flruProjects.json', JSON.stringify(flruProjects));
+  await createNewNightmare({});
+  // utils.writeFileSync('../client/src/assets/flruProjects.json', JSON.stringify(flruProjects));
 };
 
 // ? flruStart*************************************************************************
 exports.flruProjectsRead = async (req, res, next) => {
-  if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(flruProjects.projects).length, date: flruProjects.date });
+  if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(flruPrevProjects.projects).length, date: flruPrevProjects.date });
   let firstTime = req.query.firstTime;
 
   let cnt = +req.query.cnt;
-  let length = Object.keys(flruProjects.projects).length;
-  let arr = Object.keys(flruProjects.projects)[length - cnt];
+  let length = Object.keys(flruPrevProjects.projects).length;
+  let arr = Object.keys(flruPrevProjects.projects)[length - cnt];
 
   let projectsArr;
   let deleted = null;
   if (firstTime === 'true') {
-    projectsArr = utils.copyArrOfObjects(flruProjects.projects[arr]);
+    projectsArr = flruPrevProjects.projects[arr];
   } else {
-    projectsArr = utils.diff(flruPrevProjects.projects[arr], flruProjects.projects[arr]);
-    deleted = utils.diff2(flruProjects.projects[arr], flruPrevProjects.projects[arr]);
+    projectsArr = flruPrevProjects.newProjects[arr];
+    deleted = flruPrevProjects.deleted[arr];
+    if (projectsArr.length) newProjectsCleaned = false;
     console.log('projects', projectsArr.length);
     console.log('deleted', deleted.length);
-
-    if (projectsArr.length || deleted.length) flruPrevProjects.projects[arr] = utils.copyArrOfObjects(flruProjects.projects[arr]);
   }
 
-  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted });
+  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjectsCleaned });
 };
 
 let timeout;
@@ -327,8 +331,13 @@ exports.flruStart = async (req, res, next) => {
       if (projects.projects === undefined) {
         res.json({ start: true, message: 'file is empty' });
       } else {
-        flruProjects = utils.deepCloneObject(projects);
         flruPrevProjects = utils.deepCloneObject(projects);
+        flruPrevProjects.newProjects = {};
+        flruPrevProjects.deleted = {};
+        Object.keys(flruPrevProjects.projects).forEach((proj) => {
+          flruPrevProjects.newProjects[proj] = [];
+          flruPrevProjects.deleted[proj] = [];
+        });
         res.json({ start: true });
       }
     } else {
@@ -344,12 +353,18 @@ exports.flruStart = async (req, res, next) => {
     res.json({ start: true });
   }
 
+  let cnt = 0;
+
   const recursiveLoad = async () => {
     console.log('flru start load'.bgYellow);
     try {
       await this.flruClickCheerio().then(() => {
         if (!canLoading) return;
-
+        cnt++;
+        if (cnt > 1) {
+          cnt = 0;
+          mergeProjects();
+        }
         console.log('flru end load'.bgMagenta);
         timeout = setTimeout(recursiveLoad, 60000 * 5);
       });
@@ -361,6 +376,23 @@ exports.flruStart = async (req, res, next) => {
   recursiveLoad();
 };
 
+const mergeProjects = () => {
+  Object.keys(flruPrevProjects.newProjects).forEach((proj) => {
+    while (flruPrevProjects.newProjects[proj].length) {
+      flruPrevProjects.newProjects[proj].pop();
+    }
+  });
+  Object.keys(flruPrevProjects.deleted).forEach((proj) => {
+    while (flruPrevProjects.deleted[proj].length) {
+      flruPrevProjects.deleted[proj].pop();
+    }
+  });
+
+  flruPrevProjects.date = flruProjects.date;
+  flruPrevProjects.projects = utils.deepCloneObject(flruProjects.projects);
+
+  newProjectsCleaned = true;
+};
 // ? flruAbort********************************************************************************
 exports.flruAbort = async (req, res, next) => {
   clearTimeout(timeout);

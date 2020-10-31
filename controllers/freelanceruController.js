@@ -26,6 +26,7 @@ let freelanceruPrevProjects = {
   date: 'none',
 };
 
+let newProjectsCleaned = false;
 let isLoading = false;
 let canLoading;
 
@@ -117,10 +118,11 @@ exports.freelanceruLinksCheerio = async (req, res, next) => {
       $ = cheerio.load(data, { normalizeWhitespace: true, decodeEntities: false });
 
       // собираем проекты с первой страницы, мы на ней находимся
+      let section = categoryLinks[i].title;
       try {
         resultProjects = [...resultProjects, ...(await freelanceruScrapLinksCheerio($, url))];
       } catch (error) {
-        await createNewNightmare({ msg: `freelanceru 1 page of ${categoryLinks[i]} parse error`, error });
+        await createNewNightmare({ msg: `freelanceru 1 page of ${section} parse error`, error });
         // return res.json({ error: true, message: `freelanceru 1 page of ${categoryLinks[i]} parse error` });
       }
 
@@ -129,8 +131,10 @@ exports.freelanceruLinksCheerio = async (req, res, next) => {
       let isNextExists = !!$('.pagination').length;
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
-        console.log(`freelanceru ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
-        freelanceruProjects.projects[categoryLinks[i].title] = resultProjects;
+        console.log(`freelanceru ${section} - ${resultProjects.length}`.bgGreen);
+        freelanceruPrevProjects.newProjects[section] = utils.diff(freelanceruPrevProjects.projects[section], resultProjects);
+        freelanceruPrevProjects.deleted[section] = utils.diff2(resultProjects, freelanceruPrevProjects.projects[section]);
+        freelanceruProjects.projects[section] = resultProjects;
         resultProjects = [];
         continue;
       }
@@ -158,13 +162,15 @@ exports.freelanceruLinksCheerio = async (req, res, next) => {
         try {
           resultProjects = [...resultProjects, ...(await freelanceruScrapLinksCheerio($, url))];
         } catch (error) {
-          await createNewNightmare({ msg: `freelanceru ${nextLink} of ${categoryLinks[i]} parse error`, error });
-          // return res.json({ error: true, message: `freelanceru ${nextLink} of ${categoryLinks[i]} parse error` });
+          await createNewNightmare({ msg: `freelanceru ${nextLink} of ${section} parse error`, error });
+          // return res.json({ error: true, message: `freelanceru ${nextLink} of ${section} parse error` });
         }
       }
 
-      console.log(`freelanceru ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
-      freelanceruProjects.projects[categoryLinks[i].title] = resultProjects;
+      console.log(`freelanceru ${section} - ${resultProjects.length}`.bgGreen);
+      freelanceruPrevProjects.newProjects[section] = utils.diff(freelanceruPrevProjects.projects[section], resultProjects);
+      freelanceruPrevProjects.deleted[section] = utils.diff2(resultProjects, freelanceruPrevProjects.projects[section]);
+      freelanceruProjects.projects[section] = resultProjects;
       resultProjects = [];
     }
   } catch (error) {
@@ -173,33 +179,32 @@ exports.freelanceruLinksCheerio = async (req, res, next) => {
   }
 
   freelanceruProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
-  await createNewNightmare();
-  utils.writeFileSync('../client/src/assets/freelanceruProjects.json', JSON.stringify(freelanceruProjects));
+  await createNewNightmare({});
+  // utils.writeFileSync('../client/src/assets/freelanceruProjects.json', JSON.stringify(freelanceruProjects));
 };
 
 // ? freelanceruStart*******************************************************************************************
 exports.freelanceruProjectsRead = async (req, res, next) => {
-  if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(freelanceruProjects.projects).length, date: freelanceruProjects.date });
+  if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(freelanceruPrevProjects.projects).length, date: freelanceruPrevProjects.date });
   let firstTime = req.query.firstTime;
 
   let cnt = +req.query.cnt;
-  let length = Object.keys(freelanceruProjects.projects).length;
-  let arr = Object.keys(freelanceruProjects.projects)[length - cnt];
+  let length = Object.keys(freelanceruPrevProjects.projects).length;
+  let arr = Object.keys(freelanceruPrevProjects.projects)[length - cnt];
 
   let projectsArr;
   let deleted = null;
   if (firstTime === 'true') {
-    projectsArr = utils.copyArrOfObjects(freelanceruProjects.projects[arr]);
+    projectsArr = freelanceruPrevProjects.projects[arr];
   } else {
-    projectsArr = utils.diff(freelanceruPrevProjects.projects[arr], freelanceruProjects.projects[arr]);
-    deleted = utils.diff2(freelanceruProjects.projects[arr], freelanceruPrevProjects.projects[arr]);
+    projectsArr = freelanceruPrevProjects.newProjects[arr];
+    deleted = freelanceruPrevProjects.deleted[arr];
+    if (projectsArr.length) newProjectsCleaned = false;
     console.log('projects', projectsArr.length);
     console.log('deleted', deleted.length);
-
-    if (projectsArr.length || deleted.length) freelanceruPrevProjects.projects[arr] = utils.copyArrOfObjects(freelanceruProjects.projects[arr]);
   }
 
-  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted });
+  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjectsCleaned });
 };
 
 let timeout;
@@ -214,8 +219,13 @@ exports.freelanceruStart = async (req, res, next) => {
       if (projects.projects === undefined) {
         res.json({ start: true, message: 'file is empty' });
       } else {
-        freelanceruProjects = utils.deepCloneObject(projects);
         freelanceruPrevProjects = utils.deepCloneObject(projects);
+        freelanceruPrevProjects.newProjects = {};
+        freelanceruPrevProjects.deleted = {};
+        Object.keys(freelanceruPrevProjects.projects).forEach((proj) => {
+          freelanceruPrevProjects.newProjects[proj] = [];
+          freelanceruPrevProjects.deleted[proj] = [];
+        });
         res.json({ start: true });
       }
     } else {
@@ -231,12 +241,18 @@ exports.freelanceruStart = async (req, res, next) => {
     res.json({ start: true });
   }
 
+  let cnt = 0;
+
   const recursiveLoad = async () => {
     console.log('freelanceru start load'.bgYellow);
     try {
       await this.freelanceruLinksCheerio().then(() => {
         if (!canLoading) return;
-
+        cnt++;
+        if (cnt > 1) {
+          cnt = 0;
+          mergeProjects();
+        }
         console.log('freelanceru end load'.bgMagenta);
         timeout = setTimeout(recursiveLoad, 60000 * 5);
       });
@@ -246,6 +262,24 @@ exports.freelanceruStart = async (req, res, next) => {
   };
 
   recursiveLoad();
+};
+
+const mergeProjects = () => {
+  Object.keys(freelanceruPrevProjects.newProjects).forEach((proj) => {
+    while (freelanceruPrevProjects.newProjects[proj].length) {
+      freelanceruPrevProjects.newProjects[proj].pop();
+    }
+  });
+  Object.keys(freelanceruPrevProjects.deleted).forEach((proj) => {
+    while (freelanceruPrevProjects.deleted[proj].length) {
+      freelanceruPrevProjects.deleted[proj].pop();
+    }
+  });
+
+  freelanceruPrevProjects.date = freelanceruProjects.date;
+  freelanceruPrevProjects.projects = utils.deepCloneObject(freelanceruProjects.projects);
+
+  newProjectsCleaned = true;
 };
 
 // ? freelanceruAbort********************************************************************************

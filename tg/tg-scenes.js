@@ -67,15 +67,15 @@ const paginationController = async (ctx, sec, curPage, update, clicked = 'all') 
   let end = start + cardsPerPage;
   let filteredProjects = prjcs[section].slice(start, end);
 
-  let html = `<b>${curScene.val.toUpperCase()} <u>${section}</u> section - ${
-    clicked === 'all' ? '<u>All Projects:</u>' : '<u>New Projects:</u>'
+  let html = `<b>${curScene.val.toUpperCase()} <u>${section}</u> section - ${clicked === 'all' ? '<u>All Projects:</u>' : '<u>New Projects:</u>'} ${
+    prjcs[section].length
   }</b>`;
 
   for (let i = 0; i < filteredProjects.length; i++) {
     let proj = filteredProjects[i];
     html += `
 ----------------------------------------------
-  <b><a href="${proj.link}">${proj.title}</a></b>
+  <b><a href="${proj.link}">${proj.title}${proj.fixed ? ' "Fixed"' : ''}${proj.fast ? ' "Fast"' : ''}${proj.premium ? ' "Premium"' : ''}</a></b>
   <i>Заявки: ${proj.bets}</i>
   <i>Бюджет: ${proj.budget}</i>
   <i>Дата: ${proj.time}</i>
@@ -120,7 +120,7 @@ class FreelanceScenes {
 
     await updateProjectsButtons(this.ctx, fl, sections, allProjects);
     if (this.curSec !== null) {
-      await paginationController(this.ctx, this.curSec, this.curPage, true);
+      await paginationController(this.ctx, this.curSec, this.curPage, true, this.curProjects);
     }
   };
   freelanceScene() {
@@ -166,7 +166,12 @@ class FreelanceScenes {
 
           let update;
           if (this.curSec === null) update = false;
-          if (this.curSec !== null && this.curSec !== sec) update = true;
+          if (this.curSec !== null && this.curSec !== sec) {
+            update = true;
+            this.curPage = 0;
+            this.curPageAll = 0;
+            this.curPageNew = 0;
+          }
 
           await paginationController(ctx, sec, this.curPage, update);
           await ctx.answerCbQuery(`${sections[sec]} section opened.`);

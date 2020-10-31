@@ -25,6 +25,7 @@ let flhabrPrevProjects = {
   date: 'none',
 };
 
+let newProjectsCleaned = false;
 let isLoading = false;
 let canLoading;
 
@@ -138,11 +139,12 @@ exports.flhabrLinksCheerio = async (req, res, next) => {
       $ = cheerio.load(data, { normalizeWhitespace: true, decodeEntities: false });
 
       // собираем проекты с первой страницы, мы на ней находимся
+      let section = categoryLinks[i].title;
       try {
         resultProjects = [...resultProjects, ...(await flhabrScrapLinksCheerio($, url))];
       } catch (error) {
-        await createNewNightmare({ msg: `flhabr 1 page of ${categoryLinks[i]} parse error`, error });
-        // return res.json({ error: true, message: `flhabr 1 page of ${categoryLinks[i]} parse error` });
+        await createNewNightmare({ msg: `flhabr 1 page of ${section} parse error`, error });
+        // return res.json({ error: true, message: `flhabr 1 page of ${section} parse error` });
       }
       // console.log(resultProjects);
 
@@ -151,8 +153,10 @@ exports.flhabrLinksCheerio = async (req, res, next) => {
       let isNextExists = !!$('.pagination').length;
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
-        console.log(`flhabr ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
-        flhabrProjects.projects[categoryLinks[i].title] = resultProjects;
+        console.log(`flhabr ${section} - ${resultProjects.length}`.bgGreen);
+        flhabrPrevProjects.newProjects[section] = utils.diff(flhabrPrevProjects.projects[section], resultProjects);
+        flhabrPrevProjects.deleted[section] = utils.diff2(resultProjects, flhabrPrevProjects.projects[section]);
+        flhabrProjects.projects[section] = resultProjects;
         resultProjects = [];
         continue;
       }
@@ -179,13 +183,15 @@ exports.flhabrLinksCheerio = async (req, res, next) => {
         try {
           resultProjects = [...resultProjects, ...(await flhabrScrapLinksCheerio($, url))];
         } catch (error) {
-          await createNewNightmare({ msg: `flhabr ${nextLink} of ${categoryLinks[i]} parse error`, error });
-          // return res.json({ error: true, message: `flhabr ${nextLink} of ${categoryLinks[i]} parse error` });
+          await createNewNightmare({ msg: `flhabr ${nextLink} of ${section} parse error`, error });
+          // return res.json({ error: true, message: `flhabr ${nextLink} of ${section} parse error` });
         }
       }
 
-      console.log(`flhabr ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
-      flhabrProjects.projects[categoryLinks[i].title] = resultProjects;
+      console.log(`flhabr ${section} - ${resultProjects.length}`.bgGreen);
+      flhabrPrevProjects.newProjects[section] = utils.diff(flhabrPrevProjects.projects[section], resultProjects);
+      flhabrPrevProjects.deleted[section] = utils.diff2(resultProjects, flhabrPrevProjects.projects[section]);
+      flhabrProjects.projects[section] = resultProjects;
       resultProjects = [];
     }
   } catch (error) {
@@ -194,34 +200,32 @@ exports.flhabrLinksCheerio = async (req, res, next) => {
   }
 
   flhabrProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
-  await createNewNightmare();
-  utils.writeFileSync('../client/src/assets/flhabrProjects.json', JSON.stringify(flhabrProjects));
-  // res.status(200).json(flhabrProjects);
+  await createNewNightmare({});
+  // utils.writeFileSync('../client/src/assets/flhabrProjects.json', JSON.stringify(flhabrProjects));
 };
 
 // ? flhabrStart*************************************************************************
 exports.flhabrProjectsRead = async (req, res, next) => {
-  if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(flhabrProjects.projects).length, date: flhabrProjects.date });
+  if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(flhabrPrevProjects.projects).length, date: flhabrPrevProjects.date });
   let firstTime = req.query.firstTime;
 
   let cnt = req.query.cnt;
-  let length = Object.keys(flhabrProjects.projects).length;
-  let arr = Object.keys(flhabrProjects.projects)[length - cnt];
+  let length = Object.keys(flhabrPrevProjects.projects).length;
+  let arr = Object.keys(flhabrPrevProjects.projects)[length - cnt];
 
   let projectsArr;
   let deleted = null;
   if (firstTime === 'true') {
-    projectsArr = utils.copyArrOfObjects(flhabrProjects.projects[arr]);
+    projectsArr = flhabrPrevProjects.projects[arr];
   } else {
-    projectsArr = utils.diff(flhabrPrevProjects.projects[arr], flhabrProjects.projects[arr]);
-    deleted = utils.diff2(flhabrProjects.projects[arr], flhabrPrevProjects.projects[arr]);
+    projectsArr = flhabrPrevProjects.newProjects[arr];
+    deleted = flhabrPrevProjects.deleted[arr];
+    if (projectsArr.length) newProjectsCleaned = false;
     console.log('projects', projectsArr.length);
     console.log('deleted', deleted.length);
-
-    if (projectsArr.length || deleted.length) flhabrPrevProjects.projects[arr] = utils.copyArrOfObjects(flhabrProjects.projects[arr]);
   }
 
-  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted });
+  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjectsCleaned });
 };
 
 let timeout;
@@ -236,8 +240,13 @@ exports.flhabrStart = async (req, res, next) => {
       if (projects.projects === undefined) {
         res.json({ start: true, message: 'file is empty' });
       } else {
-        flhabrProjects = utils.deepCloneObject(projects);
         flhabrPrevProjects = utils.deepCloneObject(projects);
+        flhabrPrevProjects.newProjects = {};
+        flhabrPrevProjects.deleted = {};
+        Object.keys(flhabrPrevProjects.projects).forEach((proj) => {
+          flhabrPrevProjects.newProjects[proj] = [];
+          flhabrPrevProjects.deleted[proj] = [];
+        });
         res.json({ start: true });
       }
     } else {
@@ -253,12 +262,18 @@ exports.flhabrStart = async (req, res, next) => {
     res.json({ start: true });
   }
 
+  let cnt = 0;
+
   const recursiveLoad = async () => {
     console.log('flhabr start load'.bgYellow);
     try {
       await this.flhabrLinksCheerio().then(() => {
         if (!canLoading) return;
-
+        cnt++;
+        if (cnt > 1) {
+          cnt = 0;
+          mergeProjects();
+        }
         console.log('flhabr end load'.bgMagenta);
         timeout = setTimeout(recursiveLoad, 60000 * 5);
       });
@@ -270,6 +285,23 @@ exports.flhabrStart = async (req, res, next) => {
   recursiveLoad();
 };
 
+const mergeProjects = () => {
+  Object.keys(flhabrPrevProjects.newProjects).forEach((proj) => {
+    while (flhabrPrevProjects.newProjects[proj].length) {
+      flhabrPrevProjects.newProjects[proj].pop();
+    }
+  });
+  Object.keys(flhabrPrevProjects.deleted).forEach((proj) => {
+    while (flhabrPrevProjects.deleted[proj].length) {
+      flhabrPrevProjects.deleted[proj].pop();
+    }
+  });
+
+  flhabrPrevProjects.date = flhabrProjects.date;
+  flhabrPrevProjects.projects = utils.deepCloneObject(flhabrProjects.projects);
+
+  newProjectsCleaned = true;
+};
 // ? flhabrAbort********************************************************************************
 exports.flhabrAbort = async (req, res, next) => {
   clearTimeout(timeout);

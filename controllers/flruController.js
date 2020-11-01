@@ -306,7 +306,12 @@ exports.flruProjectsRead = async (req, res, next) => {
 
   let projectsArr;
   let deleted = null;
+  let newProjects = null;
   if (firstTime === 'true') {
+    if (flruPrevProjects.newProjects[arr].length || flruPrevProjects.deleted[arr].length) {
+      newProjects = flruPrevProjects.newProjects[arr];
+      deleted = flruPrevProjects.deleted[arr];
+    }
     projectsArr = flruPrevProjects.projects[arr];
   } else {
     projectsArr = flruPrevProjects.newProjects[arr];
@@ -316,7 +321,7 @@ exports.flruProjectsRead = async (req, res, next) => {
     console.log('deleted', deleted.length);
   }
 
-  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjectsCleaned });
+  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjects, newProjectsCleaned });
 };
 
 let timeout;

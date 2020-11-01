@@ -464,17 +464,24 @@ async function weblancerScrapCheerio($cheerio, url) {
 
   return projects;
 }
-exports.weblancerCheerio = async (req, res, next) => {
-  let resultProjects = [];
-
-  const url = 'https://www.weblancer.net';
-  // на данной бирже стоит кодировка win1251, поэтому переводим в utf-8
+async function fetchUrl(url) {
   let response = await fetch(url);
   response = await response.buffer();
   let data = iconv.decode(response, 'cp1251').toString();
   // console.log(data);
+  return data;
+}
+exports.weblancerCheerio = async (req, res, next) => {
+  let resultProjects = [];
 
-  let $ = cheerio.load(data, { decodeEntities: false });
+  const url = 'https://www.weblancer.net';
+  let $;
+  // на данной бирже стоит кодировка win1251, поэтому переводим в utf-8
+  try {
+    $ = cheerio.load(await fetchUrl(url), { decodeEntities: false });
+  } catch (error) {
+    console.log(`weblancer fetch ${url} error`, error);
+  }
 
   let linksObjects = $('.index_categories .align-items-stretch:first-child .list-wide li a');
   linksObjects = linksObjects.slice(0, linksObjects.length - 1);
@@ -496,13 +503,11 @@ exports.weblancerCheerio = async (req, res, next) => {
     if (!canLoading) {
       return;
     }
-    // TODO: fetch try/catch
-    let response = await fetch(categoryLinks[i].link);
-    response = await response.buffer();
-    let data = iconv.decode(response, 'cp1251').toString();
-    // console.log(data);
-
-    $ = cheerio.load(data, { normalizeWhitespace: true, decodeEntities: false });
+    try {
+      $ = cheerio.load(await fetchUrl(categoryLinks[i].link), { normalizeWhitespace: true, decodeEntities: false });
+    } catch (error) {
+      console.log(`weblancer fetch ${categoryLinks[i].link} error`, error);
+    }
 
     // собираем проекты с первой страницы, мы на ней находимся
     let section = categoryLinks[i].title;
@@ -540,12 +545,12 @@ exports.weblancerCheerio = async (req, res, next) => {
 
       if (isNextExists && !isNextDisabled) {
         // ждем чтобы не спамить запросами слишком быстро
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
-        let response = await fetch(nextLink);
-        response = await response.buffer();
-        let data = iconv.decode(response, 'cp1251').toString();
-        $ = cheerio.load(data, { normalizeWhitespace: true, decodeEntities: false });
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          $ = cheerio.load(await fetchUrl(nextLink), { normalizeWhitespace: true, decodeEntities: false });
+        } catch (error) {
+          console.log(`weblancer fetch ${nextLink} error`, error);
+        }
       }
 
       try {
@@ -578,8 +583,12 @@ exports.weblancerProjectsRead = async (req, res, next) => {
 
   let projectsArr;
   let deleted = null;
+  let newProjects = null;
   if (firstTime === 'true') {
-    // TODO: if newProjects.len, res newProjects
+    if (weblancerPrevProjects.newProjects[arr].length || weblancerPrevProjects.deleted[arr].length) {
+      newProjects = weblancerPrevProjects.newProjects[arr];
+      deleted = weblancerPrevProjects.deleted[arr];
+    }
     projectsArr = weblancerPrevProjects.projects[arr];
   } else {
     projectsArr = weblancerPrevProjects.newProjects[arr];
@@ -588,8 +597,8 @@ exports.weblancerProjectsRead = async (req, res, next) => {
     console.log('projects', projectsArr.length);
     console.log('deleted', deleted.length);
   }
-
-  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjectsCleaned });
+  // TODO: uncomment writeFile json in all controllers
+  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjects, newProjectsCleaned });
 };
 
 let timeout;

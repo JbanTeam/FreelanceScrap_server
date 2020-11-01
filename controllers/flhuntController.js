@@ -562,7 +562,12 @@ exports.flhuntProjectsRead = async (req, res, next) => {
 
   let projectsArr;
   let deleted = null;
+  let newProjects = null;
   if (firstTime === 'true') {
+    if (flhuntPrevProjects.newProjects[arr].length || flhuntPrevProjects.deleted[arr].length) {
+      newProjects = flhuntPrevProjects.newProjects[arr];
+      deleted = flhuntPrevProjects.deleted[arr];
+    }
     projectsArr = flhuntPrevProjects.projects[arr];
   } else {
     projectsArr = flhuntPrevProjects.newProjects[arr];
@@ -572,7 +577,7 @@ exports.flhuntProjectsRead = async (req, res, next) => {
     console.log('deleted', deleted.length);
   }
 
-  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjectsCleaned });
+  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjects, newProjectsCleaned });
 };
 
 let timeout;

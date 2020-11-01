@@ -215,7 +215,12 @@ exports.flhabrProjectsRead = async (req, res, next) => {
 
   let projectsArr;
   let deleted = null;
+  let newProjects = null;
   if (firstTime === 'true') {
+    if (flhabrPrevProjects.newProjects[arr].length || flhabrPrevProjects.deleted[arr].length) {
+      newProjects = flhabrPrevProjects.newProjects[arr];
+      deleted = flhabrPrevProjects.deleted[arr];
+    }
     projectsArr = flhabrPrevProjects.projects[arr];
   } else {
     projectsArr = flhabrPrevProjects.newProjects[arr];
@@ -225,7 +230,7 @@ exports.flhabrProjectsRead = async (req, res, next) => {
     console.log('deleted', deleted.length);
   }
 
-  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjectsCleaned });
+  res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjects, newProjectsCleaned });
 };
 
 let timeout;

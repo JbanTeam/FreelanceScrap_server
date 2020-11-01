@@ -18,6 +18,7 @@ const eventEmitter = new EventEmitter();
 bot.use(session());
 bot.use(stage.middleware());
 
+const url = 'http://localhost:5000';
 let allProjects = {
   weblancerProjects: {
     projects: {},
@@ -171,8 +172,20 @@ No stock market in progress.
   };
 };
 
-const setProjects = (flLower, arrName, projects) => {
+const setProjects = (flLower, arrName, projects, newPrjcts, deleted) => {
   allProjects[`${flLower}Projects`].projects[arrName] = projects.map((obj) => Object.assign({}, obj));
+  let newExists = false;
+  if (newPrjcts !== null) {
+    let newProjects = allProjects[`${flLower}Projects`].newProjects;
+    let newProjectsAll = allProjects[`${flLower}Projects`].newProjectsAll;
+
+    newProjects[arrName] = newPrjcts.map((proj) => Object.assign({}, proj));
+    newProjectsAll[arrName] = newPrjcts.map((proj) => proj.link);
+    newExists = true;
+
+    addToProjects(flLower, arrName, newPrjcts, deleted);
+  }
+  return newExists;
 };
 
 const addNewProjects = (flLower, arrName, projects, deleted) => {
@@ -209,13 +222,13 @@ const resetNewProjectsAll = (flLower, arrName) => {
 };
 
 const addToProjects = (flLower, arrName, projects, deleted) => {
-  if (deleted.length) {
+  if (deleted && deleted.length) {
     allProjects[`${flLower}Projects`].projects[arrName] = allProjects[`${flLower}Projects`].projects[arrName].filter((proj) => {
       return deleted.indexOf(proj.link) === -1;
     });
   }
 
-  if (projects.length) {
+  if (projects && projects.length) {
     allProjects[`${flLower}Projects`].projects[arrName].unshift(...projects.map((obj) => Object.assign({}, obj)));
   }
 };
@@ -241,7 +254,7 @@ const startLoading = async (flLower) => {
   }
 
   try {
-    return await axios.get(`http://localhost:5000/api/${flLower}-start${type}`);
+    return await axios.get(`${url}/api/${flLower}-start${type}`);
     // console.log(run.data);
   } catch (error) {
     console.log(error);
@@ -249,7 +262,7 @@ const startLoading = async (flLower) => {
 };
 
 const projectsRead = async (ctx, fl, flLower, firstTime) => {
-  let response = await axios.get(`http://localhost:5000/api/${flLower}-projects?cnt=0&firstTime=${firstTime}`);
+  let response = await axios.get(`${url}/api/${flLower}-projects?cnt=0&firstTime=${firstTime}`);
 
   let cnt = response.data.cnt;
   let date = response.data.date;
@@ -258,14 +271,15 @@ const projectsRead = async (ctx, fl, flLower, firstTime) => {
   allProjects[`${flLower}Projects`].date = date;
 
   while (cnt !== 0) {
-    let projects = await axios.get(`http://localhost:5000/api/${flLower}-projects?cnt=${cnt}&firstTime=${firstTime}`);
+    let projects = await axios.get(`${url}/api/${flLower}-projects?cnt=${cnt}&firstTime=${firstTime}`);
     cnt = projects.data.cnt;
     delete projects.data.cnt;
 
     let arrName = projects.data.arrName;
 
     if (firstTime) {
-      setProjects(flLower, arrName, projects.data[arrName]);
+      let res = setProjects(flLower, arrName, projects.data[arrName], projects.data.newProjects, projects.data.deleted);
+      if (!newExists) newExists = res;
     } else {
       if (projects.data[arrName].length || projects.data.deleted.length) {
         let res = addNewProjects(flLower, arrName, projects.data[arrName], projects.data.deleted);
@@ -291,7 +305,7 @@ const projectsRead = async (ctx, fl, flLower, firstTime) => {
 const abortLoading = async (ctx, fl) => {
   try {
     let flLower = freelanceArr[fl].title.toLowerCase();
-    await axios.get(`http://localhost:5000/api/${flLower}-abort`);
+    await axios.get(`${url}/api/${flLower}-abort`);
 
     freelanceArr[fl].isl = false;
     clearTimeout(freelanceArr[fl].timeout);

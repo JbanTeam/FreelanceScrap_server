@@ -328,7 +328,7 @@ exports.flhabrAbort = async (req, res, next) => {
   clearTimeout(timeout);
   isLoading = false;
   canLoading = false;
-  await createNewNightmare({ aborted: true });
 
   res.json({ aborted: true });
+  await createNewNightmare({ aborted: true });
 };

@@ -179,8 +179,14 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
         console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
-        weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
-        weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+        if (weblancerPrevProjects.projects[section] === undefined) {
+          weblancerPrevProjects.projects[section] = resultProjects;
+          weblancerPrevProjects.newProjects[section] = resultProjects;
+          weblancerPrevProjects.deleted[section] = [];
+        } else {
+          weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
+          weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+        }
         weblancerProjects.projects[section] = resultProjects;
         resultProjects = [];
         continue;
@@ -215,8 +221,14 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
       }
 
       console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
-      weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
-      weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+      if (weblancerPrevProjects.projects[section] === undefined) {
+        weblancerPrevProjects.projects[section] = resultProjects;
+        weblancerPrevProjects.newProjects[section] = resultProjects;
+        weblancerPrevProjects.deleted[section] = [];
+      } else {
+        weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
+        weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+      }
       weblancerProjects.projects[section] = resultProjects;
       resultProjects = [];
     }
@@ -227,7 +239,7 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
 
   weblancerProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
   await createNewNightmare({});
-  utils.writeFileSync('../client/src/assets/weblancerProjects.json', JSON.stringify(weblancerProjects));
+  utils.writeFileSync('./db/weblancerProjects.json', JSON.stringify(weblancerProjects));
   // res.status(200).json(weblancerProjects);
 };
 // ? weblancerClick********************************************************************************
@@ -305,8 +317,14 @@ async function weblancerScrapClick(section) {
 
   // console.dir(resultProjects, { depth: null });
   console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
-  weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
-  weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+  if (weblancerPrevProjects.projects[section] === undefined) {
+    weblancerPrevProjects.projects[section] = resultProjects;
+    weblancerPrevProjects.newProjects[section] = resultProjects;
+    weblancerPrevProjects.deleted[section] = [];
+  } else {
+    weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
+    weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+  }
   weblancerProjects.projects[section] = resultProjects;
   // console.log(weblancerProjects);
 }
@@ -398,7 +416,7 @@ exports.weblancerClick = async (req, res, next) => {
 
   weblancerProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
   await createNewNightmare({});
-  utils.writeFileSync('../client/src/assets/weblancerProjects.json', JSON.stringify(weblancerProjects));
+  utils.writeFileSync('./db/weblancerProjects.json', JSON.stringify(weblancerProjects));
   // res.status(200).json(weblancerProjects);
 };
 
@@ -524,8 +542,14 @@ exports.weblancerCheerio = async (req, res, next) => {
     if (!isNextExists) {
       console.log('next disabled', true, 'next exists', isNextExists);
       console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
-      weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
-      weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+      if (weblancerPrevProjects.projects[section] === undefined) {
+        weblancerPrevProjects.projects[section] = resultProjects;
+        weblancerPrevProjects.newProjects[section] = resultProjects;
+        weblancerPrevProjects.deleted[section] = [];
+      } else {
+        weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
+        weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+      }
       weblancerProjects.projects[section] = resultProjects;
       resultProjects = [];
       continue;
@@ -562,13 +586,19 @@ exports.weblancerCheerio = async (req, res, next) => {
     }
 
     console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
-    weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
-    weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+    if (weblancerPrevProjects.projects[section] === undefined) {
+      weblancerPrevProjects.projects[section] = resultProjects;
+      weblancerPrevProjects.newProjects[section] = resultProjects;
+      weblancerPrevProjects.deleted[section] = [];
+    } else {
+      weblancerPrevProjects.newProjects[section] = utils.diff(weblancerPrevProjects.projects[section], resultProjects);
+      weblancerPrevProjects.deleted[section] = utils.diff2(resultProjects, weblancerPrevProjects.projects[section]);
+    }
     weblancerProjects.projects[section] = resultProjects;
     resultProjects = [];
   }
   weblancerProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
-  // utils.writeFileSync('../client/src/assets/weblancerProjects.json', JSON.stringify(weblancerProjects));
+  utils.writeFileSync('./db/weblancerProjects.json', JSON.stringify(weblancerProjects));
   // res.status(200).json(weblancerProjects);
 };
 
@@ -597,7 +627,6 @@ exports.weblancerProjectsRead = async (req, res, next) => {
     console.log('projects', projectsArr.length);
     console.log('deleted', deleted.length);
   }
-  // TODO: uncomment writeFile json in all controllers
   res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjects, newProjectsCleaned });
 };
 
@@ -606,10 +635,12 @@ let firstTimeReadProjects = true;
 exports.weblancerStart = async (req, res, next) => {
   canLoading = true;
   if (firstTimeReadProjects) {
-    let fileExists = utils.fileExists('../client/src/assets/weblancerProjects.json');
+    let fileExists = utils.fileExists('./db/weblancerProjects.json');
     if (fileExists) {
-      let projects = JSON.parse(utils.readFileSync('../client/src/assets/weblancerProjects.json'));
+      let projects = JSON.parse(utils.readFileSync('./db/weblancerProjects.json'));
       if (projects.projects === undefined) {
+        weblancerPrevProjects.newProjects = {};
+        weblancerPrevProjects.deleted = {};
         res.json({ start: true, message: 'file is empty' });
       } else {
         weblancerPrevProjects = utils.deepCloneObject(projects);
@@ -622,6 +653,8 @@ exports.weblancerStart = async (req, res, next) => {
         res.json({ start: true });
       }
     } else {
+      weblancerPrevProjects.newProjects = {};
+      weblancerPrevProjects.deleted = {};
       res.json({ start: true, message: 'file not exists' });
     }
     isLoading = true;
@@ -657,12 +690,12 @@ exports.weblancerStart = async (req, res, next) => {
       await loadFunction().then(() => {
         if (!canLoading) return;
         cnt++;
-        if (cnt > 1) {
+        if (cnt > 50) {
           cnt = 0;
           mergeProjects();
         }
         console.log('weblancer end load'.bgMagenta);
-        timeout = setTimeout(recursiveLoad, 20000);
+        timeout = setTimeout(recursiveLoad, 60000 * 5);
       });
     } catch (error) {
       clearTimeout(timeout);

@@ -175,8 +175,14 @@ exports.flhuntLinksCheerio = async (req, res, next) => {
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
         console.log(`flhunt ${section} - ${resultProjects.length}`.bgGreen);
-        flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
-        flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+        if (flhuntPrevProjects.projects[section] === undefined) {
+          flhuntPrevProjects.projects[section] = resultProjects;
+          flhuntPrevProjects.newProjects[section] = resultProjects;
+          flhuntPrevProjects.deleted[section] = [];
+        } else {
+          flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
+          flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+        }
         flhuntProjects.projects[section] = resultProjects;
         resultProjects = [];
         continue;
@@ -210,8 +216,14 @@ exports.flhuntLinksCheerio = async (req, res, next) => {
       }
 
       console.log(`flhunt ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
-      flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
-      flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+      if (flhuntPrevProjects.projects[section] === undefined) {
+        flhuntPrevProjects.projects[section] = resultProjects;
+        flhuntPrevProjects.newProjects[section] = resultProjects;
+        flhuntPrevProjects.deleted[section] = [];
+      } else {
+        flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
+        flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+      }
       flhuntProjects.projects[section] = resultProjects;
       resultProjects = [];
     }
@@ -222,7 +234,7 @@ exports.flhuntLinksCheerio = async (req, res, next) => {
 
   flhuntProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
   await createNewNightmare({});
-  // utils.writeFileSync('../client/src/assets/flhuntProjects.json', JSON.stringify(flhuntProjects));
+  utils.writeFileSync('./db/flhuntProjects.json', JSON.stringify(flhuntProjects));
   // res.status(200).json(flhuntProjects);
 };
 // ? flhuntLinks********************************************************************************
@@ -330,8 +342,14 @@ exports.flhuntLinks = async (req, res, next) => {
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
         console.log(`flhunt ${section} - ${resultProjects.length}`.bgGreen);
-        flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
-        flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+        if (flhuntPrevProjects.projects[section] === undefined) {
+          flhuntPrevProjects.projects[section] = resultProjects;
+          flhuntPrevProjects.newProjects[section] = resultProjects;
+          flhuntPrevProjects.deleted[section] = [];
+        } else {
+          flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
+          flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+        }
         flhuntProjects.projects[section] = resultProjects;
         resultProjects = [];
         continue;
@@ -362,8 +380,14 @@ exports.flhuntLinks = async (req, res, next) => {
       }
 
       console.log(`flhunt ${section} - ${resultProjects.length}`.bgGreen);
-      flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
-      flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+      if (flhuntPrevProjects.projects[section] === undefined) {
+        flhuntPrevProjects.projects[section] = resultProjects;
+        flhuntPrevProjects.newProjects[section] = resultProjects;
+        flhuntPrevProjects.deleted[section] = [];
+      } else {
+        flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
+        flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+      }
       flhuntProjects.projects[section] = resultProjects;
       resultProjects = [];
     }
@@ -374,7 +398,7 @@ exports.flhuntLinks = async (req, res, next) => {
 
   flhuntProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
   await createNewNightmare({});
-  utils.writeFileSync('../client/src/assets/flhuntProjects.json', JSON.stringify(flhuntProjects));
+  utils.writeFileSync('./db/flhuntProjects.json', JSON.stringify(flhuntProjects));
   // res.status(200).json(flhuntProjects);
 };
 
@@ -445,8 +469,14 @@ async function flhuntScrapClick(section) {
 
   // console.dir(resultProjects, { depth: null });
   console.log(`flhunt ${section} - ${resultProjects.length}`.bgGreen);
-  flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
-  flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+  if (flhuntPrevProjects.projects[section] === undefined) {
+    flhuntPrevProjects.projects[section] = resultProjects;
+    flhuntPrevProjects.newProjects[section] = resultProjects;
+    flhuntPrevProjects.deleted[section] = [];
+  } else {
+    flhuntPrevProjects.newProjects[section] = utils.diff(flhuntPrevProjects.projects[section], resultProjects);
+    flhuntPrevProjects.deleted[section] = utils.diff2(resultProjects, flhuntPrevProjects.projects[section]);
+  }
   flhuntProjects.projects[section] = resultProjects;
   // console.log(flhuntProjects);
 }
@@ -547,7 +577,7 @@ exports.flhuntClick = async (req, res, next) => {
 
   flhuntProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
   await createNewNightmare({});
-  utils.writeFileSync('../client/src/assets/flhuntProjects.json', JSON.stringify(flhuntProjects));
+  utils.writeFileSync('./db/flhuntProjects.json', JSON.stringify(flhuntProjects));
   // res.status(200).json(flhuntProjects);
 };
 
@@ -586,10 +616,12 @@ exports.flhuntStart = async (req, res, next) => {
   canLoading = true;
 
   if (firstTimeReadProjects) {
-    let fileExists = utils.fileExists('../client/src/assets/flhuntProjects.json');
+    let fileExists = utils.fileExists('./db/flhuntProjects.json');
     if (fileExists) {
-      let projects = JSON.parse(utils.readFileSync('../client/src/assets/flhuntProjects.json'));
+      let projects = JSON.parse(utils.readFileSync('./db/flhuntProjects.json'));
       if (projects.projects === undefined) {
+        flhuntPrevProjects.newProjects = {};
+        flhuntPrevProjects.deleted = {};
         res.json({ start: true, message: 'file is empty' });
       } else {
         flhuntPrevProjects = utils.deepCloneObject(projects);
@@ -602,6 +634,8 @@ exports.flhuntStart = async (req, res, next) => {
         res.json({ start: true });
       }
     } else {
+      flhuntPrevProjects.newProjects = {};
+      flhuntPrevProjects.deleted = {};
       res.json({ start: true, message: 'file not exists' });
     }
     isLoading = true;
@@ -637,7 +671,7 @@ exports.flhuntStart = async (req, res, next) => {
       await loadFunction().then(() => {
         if (!canLoading) return;
         cnt++;
-        if (cnt > 1) {
+        if (cnt > 50) {
           cnt = 0;
           mergeProjects();
         }

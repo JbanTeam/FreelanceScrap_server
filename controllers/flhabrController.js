@@ -154,8 +154,14 @@ exports.flhabrLinksCheerio = async (req, res, next) => {
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
         console.log(`flhabr ${section} - ${resultProjects.length}`.bgGreen);
-        flhabrPrevProjects.newProjects[section] = utils.diff(flhabrPrevProjects.projects[section], resultProjects);
-        flhabrPrevProjects.deleted[section] = utils.diff2(resultProjects, flhabrPrevProjects.projects[section]);
+        if (flhabrPrevProjects.projects[section] === undefined) {
+          flhabrPrevProjects.projects[section] = resultProjects;
+          flhabrPrevProjects.newProjects[section] = resultProjects;
+          flhabrPrevProjects.deleted[section] = [];
+        } else {
+          flhabrPrevProjects.newProjects[section] = utils.diff(flhabrPrevProjects.projects[section], resultProjects);
+          flhabrPrevProjects.deleted[section] = utils.diff2(resultProjects, flhabrPrevProjects.projects[section]);
+        }
         flhabrProjects.projects[section] = resultProjects;
         resultProjects = [];
         continue;
@@ -189,8 +195,14 @@ exports.flhabrLinksCheerio = async (req, res, next) => {
       }
 
       console.log(`flhabr ${section} - ${resultProjects.length}`.bgGreen);
-      flhabrPrevProjects.newProjects[section] = utils.diff(flhabrPrevProjects.projects[section], resultProjects);
-      flhabrPrevProjects.deleted[section] = utils.diff2(resultProjects, flhabrPrevProjects.projects[section]);
+      if (flhabrPrevProjects.projects[section] === undefined) {
+        flhabrPrevProjects.projects[section] = resultProjects;
+        flhabrPrevProjects.newProjects[section] = resultProjects;
+        flhabrPrevProjects.deleted[section] = [];
+      } else {
+        flhabrPrevProjects.newProjects[section] = utils.diff(flhabrPrevProjects.projects[section], resultProjects);
+        flhabrPrevProjects.deleted[section] = utils.diff2(resultProjects, flhabrPrevProjects.projects[section]);
+      }
       flhabrProjects.projects[section] = resultProjects;
       resultProjects = [];
     }
@@ -201,7 +213,7 @@ exports.flhabrLinksCheerio = async (req, res, next) => {
 
   flhabrProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
   await createNewNightmare({});
-  // utils.writeFileSync('../client/src/assets/flhabrProjects.json', JSON.stringify(flhabrProjects));
+  utils.writeFileSync('./db/flhabrProjects.json', JSON.stringify(flhabrProjects));
 };
 
 // ? flhabrStart*************************************************************************
@@ -239,10 +251,12 @@ exports.flhabrStart = async (req, res, next) => {
   canLoading = true;
 
   if (firstTimeReadProjects) {
-    let fileExists = utils.fileExists('../client/src/assets/flhabrProjects.json');
+    let fileExists = utils.fileExists('./db/flhabrProjects.json');
     if (fileExists) {
-      let projects = JSON.parse(utils.readFileSync('../client/src/assets/flhabrProjects.json'));
+      let projects = JSON.parse(utils.readFileSync('./db/flhabrProjects.json'));
       if (projects.projects === undefined) {
+        flhabrPrevProjects.newProjects = {};
+        flhabrPrevProjects.deleted = {};
         res.json({ start: true, message: 'file is empty' });
       } else {
         flhabrPrevProjects = utils.deepCloneObject(projects);
@@ -255,6 +269,8 @@ exports.flhabrStart = async (req, res, next) => {
         res.json({ start: true });
       }
     } else {
+      flhabrPrevProjects.newProjects = {};
+      flhabrPrevProjects.deleted = {};
       res.json({ start: true, message: 'file not exists' });
     }
     isLoading = true;
@@ -275,7 +291,7 @@ exports.flhabrStart = async (req, res, next) => {
       await this.flhabrLinksCheerio().then(() => {
         if (!canLoading) return;
         cnt++;
-        if (cnt > 1) {
+        if (cnt > 50) {
           cnt = 0;
           mergeProjects();
         }

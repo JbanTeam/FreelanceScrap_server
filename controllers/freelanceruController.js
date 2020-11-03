@@ -132,8 +132,14 @@ exports.freelanceruLinksCheerio = async (req, res, next) => {
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
         console.log(`freelanceru ${section} - ${resultProjects.length}`.bgGreen);
-        freelanceruPrevProjects.newProjects[section] = utils.diff(freelanceruPrevProjects.projects[section], resultProjects);
-        freelanceruPrevProjects.deleted[section] = utils.diff2(resultProjects, freelanceruPrevProjects.projects[section]);
+        if (freelanceruPrevProjects.projects[section] === undefined) {
+          freelanceruPrevProjects.projects[section] = resultProjects;
+          freelanceruPrevProjects.newProjects[section] = resultProjects;
+          freelanceruPrevProjects.deleted[section] = [];
+        } else {
+          freelanceruPrevProjects.newProjects[section] = utils.diff(freelanceruPrevProjects.projects[section], resultProjects);
+          freelanceruPrevProjects.deleted[section] = utils.diff2(resultProjects, freelanceruPrevProjects.projects[section]);
+        }
         freelanceruProjects.projects[section] = resultProjects;
         resultProjects = [];
         continue;
@@ -168,8 +174,14 @@ exports.freelanceruLinksCheerio = async (req, res, next) => {
       }
 
       console.log(`freelanceru ${section} - ${resultProjects.length}`.bgGreen);
-      freelanceruPrevProjects.newProjects[section] = utils.diff(freelanceruPrevProjects.projects[section], resultProjects);
-      freelanceruPrevProjects.deleted[section] = utils.diff2(resultProjects, freelanceruPrevProjects.projects[section]);
+      if (freelanceruPrevProjects.projects[section] === undefined) {
+        freelanceruPrevProjects.projects[section] = resultProjects;
+        freelanceruPrevProjects.newProjects[section] = resultProjects;
+        freelanceruPrevProjects.deleted[section] = [];
+      } else {
+        freelanceruPrevProjects.newProjects[section] = utils.diff(freelanceruPrevProjects.projects[section], resultProjects);
+        freelanceruPrevProjects.deleted[section] = utils.diff2(resultProjects, freelanceruPrevProjects.projects[section]);
+      }
       freelanceruProjects.projects[section] = resultProjects;
       resultProjects = [];
     }
@@ -180,7 +192,7 @@ exports.freelanceruLinksCheerio = async (req, res, next) => {
 
   freelanceruProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
   await createNewNightmare({});
-  // utils.writeFileSync('../client/src/assets/freelanceruProjects.json', JSON.stringify(freelanceruProjects));
+  utils.writeFileSync('./db/freelanceruProjects.json', JSON.stringify(freelanceruProjects));
 };
 
 // ? freelanceruStart*******************************************************************************************
@@ -218,10 +230,12 @@ exports.freelanceruStart = async (req, res, next) => {
   canLoading = true;
 
   if (firstTimeReadProjects) {
-    let fileExists = utils.fileExists('../client/src/assets/freelanceruProjects.json');
+    let fileExists = utils.fileExists('./db/freelanceruProjects.json');
     if (fileExists) {
-      let projects = JSON.parse(utils.readFileSync('../client/src/assets/freelanceruProjects.json'));
+      let projects = JSON.parse(utils.readFileSync('./db/freelanceruProjects.json'));
       if (projects.projects === undefined) {
+        freelanceruPrevProjects.newProjects = {};
+        freelanceruPrevProjects.deleted = {};
         res.json({ start: true, message: 'file is empty' });
       } else {
         freelanceruPrevProjects = utils.deepCloneObject(projects);
@@ -234,6 +248,8 @@ exports.freelanceruStart = async (req, res, next) => {
         res.json({ start: true });
       }
     } else {
+      freelanceruPrevProjects.newProjects = {};
+      freelanceruPrevProjects.deleted = {};
       res.json({ start: true, message: 'file not exists' });
     }
     isLoading = true;
@@ -254,7 +270,7 @@ exports.freelanceruStart = async (req, res, next) => {
       await this.freelanceruLinksCheerio().then(() => {
         if (!canLoading) return;
         cnt++;
-        if (cnt > 1) {
+        if (cnt > 50) {
           cnt = 0;
           mergeProjects();
         }

@@ -18,7 +18,7 @@ const eventEmitter = new EventEmitter();
 bot.use(session());
 bot.use(stage.middleware());
 
-const url = 'http://localhost:5000';
+const axiosInstance = axios.create({ baseURL: process.env.BASE_URL });
 let allProjects = {
   weblancerProjects: {
     projects: {},
@@ -229,7 +229,11 @@ const addToProjects = (flLower, arrName, projects, deleted) => {
   }
 
   if (projects && projects.length) {
-    allProjects[`${flLower}Projects`].projects[arrName].unshift(...projects.map((obj) => Object.assign({}, obj)));
+    if (allProjects[`${flLower}Projects`].projects[arrName] === undefined) {
+      allProjects[`${flLower}Projects`].projects[arrName] = projects.map((obj) => Object.assign({}, obj));
+    } else {
+      allProjects[`${flLower}Projects`].projects[arrName].unshift(...projects.map((obj) => Object.assign({}, obj)));
+    }
   }
 };
 
@@ -254,7 +258,7 @@ const startLoading = async (flLower) => {
   }
 
   try {
-    return await axios.get(`${url}/api/${flLower}-start${type}`);
+    return await axiosInstance.get(`/api/${flLower}-start${type}`);
     // console.log(run.data);
   } catch (error) {
     console.log(error);
@@ -262,7 +266,7 @@ const startLoading = async (flLower) => {
 };
 
 const projectsRead = async (ctx, fl, flLower, firstTime) => {
-  let response = await axios.get(`${url}/api/${flLower}-projects?cnt=0&firstTime=${firstTime}`);
+  let response = await axiosInstance.get(`/api/${flLower}-projects?cnt=0&firstTime=${firstTime}`);
 
   let cnt = response.data.cnt;
   let date = response.data.date;
@@ -271,7 +275,7 @@ const projectsRead = async (ctx, fl, flLower, firstTime) => {
   allProjects[`${flLower}Projects`].date = date;
 
   while (cnt !== 0) {
-    let projects = await axios.get(`${url}/api/${flLower}-projects?cnt=${cnt}&firstTime=${firstTime}`);
+    let projects = await axiosInstance.get(`/api/${flLower}-projects?cnt=${cnt}&firstTime=${firstTime}`);
     cnt = projects.data.cnt;
     delete projects.data.cnt;
 
@@ -299,13 +303,13 @@ const projectsRead = async (ctx, fl, flLower, firstTime) => {
 
   freelanceArr[fl].timeout = setTimeout(async () => {
     await projectsRead(ctx, fl, flLower, firstLoad);
-  }, 65000);
+  }, 60000 * 3);
 };
 
 const abortLoading = async (ctx, fl) => {
   try {
     let flLower = freelanceArr[fl].title.toLowerCase();
-    await axios.get(`${url}/api/${flLower}-abort`);
+    await axiosInstance.get(`/api/${flLower}-abort`);
 
     freelanceArr[fl].isl = false;
     clearTimeout(freelanceArr[fl].timeout);

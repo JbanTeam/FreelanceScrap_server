@@ -125,8 +125,14 @@ async function flruScrapClickCheerio(section, url) {
   if (!isNextExists) {
     console.log('next disabled', true, 'next exists', isNextExists);
     console.log(`flru ${section} - ${resultProjects.length}`.bgGreen);
-    flruPrevProjects.newProjects[section] = utils.diff(flruPrevProjects.projects[section], resultProjects);
-    flruPrevProjects.deleted[section] = utils.diff2(resultProjects, flruPrevProjects.projects[section]);
+    if (flruPrevProjects.projects[section] === undefined) {
+      flruPrevProjects.projects[section] = resultProjects;
+      flruPrevProjects.newProjects[section] = resultProjects;
+      flruPrevProjects.deleted[section] = [];
+    } else {
+      flruPrevProjects.newProjects[section] = utils.diff(flruPrevProjects.projects[section], resultProjects);
+      flruPrevProjects.deleted[section] = utils.diff2(resultProjects, flruPrevProjects.projects[section]);
+    }
     flruProjects.projects[section] = resultProjects;
   }
 
@@ -162,8 +168,14 @@ async function flruScrapClickCheerio(section, url) {
   }
 
   console.log(`flru ${section} - ${resultProjects.length}`.bgGreen);
-  flruPrevProjects.newProjects[section] = utils.diff(flruPrevProjects.projects[section], resultProjects);
-  flruPrevProjects.deleted[section] = utils.diff2(resultProjects, flruPrevProjects.projects[section]);
+  if (flruPrevProjects.projects[section] === undefined) {
+    flruPrevProjects.projects[section] = resultProjects;
+    flruPrevProjects.newProjects[section] = resultProjects;
+    flruPrevProjects.deleted[section] = [];
+  } else {
+    flruPrevProjects.newProjects[section] = utils.diff(flruPrevProjects.projects[section], resultProjects);
+    flruPrevProjects.deleted[section] = utils.diff2(resultProjects, flruPrevProjects.projects[section]);
+  }
   flruProjects.projects[section] = resultProjects;
 }
 
@@ -292,7 +304,7 @@ exports.flruClickCheerio = async () => {
 
   flruProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
   await createNewNightmare({});
-  // utils.writeFileSync('../client/src/assets/flruProjects.json', JSON.stringify(flruProjects));
+  utils.writeFileSync('./db/flruProjects.json', JSON.stringify(flruProjects));
 };
 
 // ? flruStart*************************************************************************
@@ -330,10 +342,12 @@ exports.flruStart = async (req, res, next) => {
   canLoading = true;
 
   if (firstTimeReadProjects) {
-    let fileExists = utils.fileExists('../client/src/assets/flruProjects.json');
+    let fileExists = utils.fileExists('./db/flruProjects.json');
     if (fileExists) {
-      let projects = JSON.parse(utils.readFileSync('../client/src/assets/flruProjects.json'));
+      let projects = JSON.parse(utils.readFileSync('./db/flruProjects.json'));
       if (projects.projects === undefined) {
+        flruPrevProjects.newProjects = {};
+        flruPrevProjects.deleted = {};
         res.json({ start: true, message: 'file is empty' });
       } else {
         flruPrevProjects = utils.deepCloneObject(projects);
@@ -346,6 +360,8 @@ exports.flruStart = async (req, res, next) => {
         res.json({ start: true });
       }
     } else {
+      flruPrevProjects.newProjects = {};
+      flruPrevProjects.deleted = {};
       res.json({ start: true, message: 'file not exists' });
     }
     isLoading = true;
@@ -366,7 +382,7 @@ exports.flruStart = async (req, res, next) => {
       await this.flruClickCheerio().then(() => {
         if (!canLoading) return;
         cnt++;
-        if (cnt > 1) {
+        if (cnt > 50) {
           cnt = 0;
           mergeProjects();
         }

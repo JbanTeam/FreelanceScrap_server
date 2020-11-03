@@ -9,6 +9,9 @@
   },
   "author": "JT",
   "license": "ISC",
+  "nodemonConfig": {
+    "ignore": ["db/*"]
+  },
   "dependencies": {
     "axios": "^0.20.0",
     "body-parser": "^1.19.0",

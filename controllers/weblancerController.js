@@ -36,6 +36,7 @@ let canLoading;
 // weblancer********************************************************************************
 // weblancer********************************************************************************
 async function createNewNightmare({ msg, error, aborted }) {
+  // выводим ссобщения в консоль и заканчиваем работу nightmare и создаем его новый экземпляр
   if (msg) {
     console.log('message:', msg, 'err:', error);
   }
@@ -54,10 +55,12 @@ async function createNewNightmare({ msg, error, aborted }) {
   });
 }
 // ? weblancerLinksCheerio********************************************************************************
+// обходим страницы с помощью nightmare и cheerio
 async function weblancerScrapLinksCheerio($cheerio, url) {
   let all = $cheerio('.cols_table:not(.order-last) .click_container-link.set_href');
   // console.log(all);
 
+  // формируем массив объектов с нужными полями
   let projects = [];
 
   if (all.length) {
@@ -120,6 +123,7 @@ async function weblancerScrapLinksCheerio($cheerio, url) {
 exports.weblancerLinksCheerio = async (req, res, next) => {
   let resultProjects = [];
   const url = 'https://www.weblancer.net';
+  // идем на главную страницу
   try {
     await nightmare.goto(url).wait('.index_categories .align-items-stretch:first-child .list-wide');
   } catch (error) {
@@ -128,14 +132,16 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
   }
 
   try {
+    // получаем страницу
     const data = await nightmare.evaluate(() => {
       return document.body.innerHTML;
     });
 
     // console.log(data);
-
+    // загружаем страницу в cheerio
     let $ = cheerio.load(data, { normalizeWhitespace: true, decodeEntities: false });
 
+    // формируем массив ссылок на разделы
     let linksObjects = $('.index_categories .align-items-stretch:first-child .list-wide li a');
     linksObjects = linksObjects.slice(0, linksObjects.length - 1);
     let categoryLinks = [];
@@ -151,7 +157,7 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
     });
     console.log(categoryLinks);
 
-    // пробегаемся по всем страницам раздела
+    // пробегаемся по всем страницам разделов
     for (let i = 0; i < categoryLinks.length; i++) {
       if (!canLoading) {
         return;
@@ -164,7 +170,7 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
 
       $ = cheerio.load(data, { normalizeWhitespace: true, decodeEntities: false });
 
-      // собираем проекты с первой страницы, мы на ней находимся
+      // собираем проекты с первой страницы раздела, мы на ней находимся
       let section = categoryLinks[i].title;
       try {
         resultProjects = [...resultProjects, ...(await weblancerScrapLinksCheerio($, url))];
@@ -173,12 +179,13 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
         // return res.json({ error: true, message: `weblancer 1 page of ${section} parse error` });
       }
 
-      // пробегаемся по оставшимся страницам и собираем проекты
       let isNextDisabled = false;
       let isNextExists = !!$('.pagination_box').length;
+      // если страниц больше нет записываем результаты
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
         console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
+        // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
         if (weblancerPrevProjects.projects[section] === undefined) {
           weblancerPrevProjects.projects[section] = resultProjects;
           weblancerPrevProjects.newProjects[section] = resultProjects;
@@ -192,6 +199,8 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
         continue;
       }
 
+      // пробегаемся по оставшимся страницам и собираем проекты
+      // пока есть следующая страница собираем проекты
       while (!isNextDisabled) {
         if (!canLoading) {
           return;
@@ -222,6 +231,7 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
 
       console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
       if (weblancerPrevProjects.projects[section] === undefined) {
+        // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
         weblancerPrevProjects.projects[section] = resultProjects;
         weblancerPrevProjects.newProjects[section] = resultProjects;
         weblancerPrevProjects.deleted[section] = [];
@@ -237,17 +247,22 @@ exports.weblancerLinksCheerio = async (req, res, next) => {
     // return res.json({ error: true, message: 'weblancer category links parse error' });
   }
 
+  // устанавливаем дату
   weblancerProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
+  // завершаем работу nightmare и создаем его новый экземпляр
   await createNewNightmare({});
+  // записываем проекты в файл
   utils.writeFileSync('./db/weblancerProjects.json', JSON.stringify(weblancerProjects));
   // res.status(200).json(weblancerProjects);
 };
 // ? weblancerClick********************************************************************************
+// обходим страницы с помощью nightmare по средствам кликов на ссылки
 async function weblancerScrapClick(section) {
   let isNextDisabled = false;
   let isNextExists = await nightmare.exists('.pagination_box');
   let resultProjects = [];
 
+  // пока есть следующая страница собираем проекты
   while (!isNextDisabled) {
     if (!canLoading) {
       return;
@@ -255,6 +270,7 @@ async function weblancerScrapClick(section) {
     !isNextExists ? (isNextDisabled = true) : (isNextDisabled = !(await nightmare.exists('.pagination_box .text-center a.active + a')));
     console.log('next disabled', isNextDisabled, 'next exists', isNextExists);
 
+    // формируем массив объектов с нужными полями
     let projects = await nightmare.wait('.page_content .cols_table').evaluate(() => {
       let all = [...document.querySelectorAll('.cols_table:not(.order-last) .click_container-link.set_href')];
       // console.log(all);
@@ -311,12 +327,14 @@ async function weblancerScrapClick(section) {
 
     projects = [];
 
+    // если есть следующая страница то переходим на нее
     if (isNextExists && !isNextDisabled)
       await nightmare.click('.pagination_box .text-center a.active + a').wait('.page_content .cols_table').wait(1000);
   }
 
   // console.dir(resultProjects, { depth: null });
   console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
+  // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
   if (weblancerPrevProjects.projects[section] === undefined) {
     weblancerPrevProjects.projects[section] = resultProjects;
     weblancerPrevProjects.newProjects[section] = resultProjects;
@@ -414,14 +432,19 @@ exports.weblancerClick = async (req, res, next) => {
     // return res.json({ error: true, message: 'weblancer cms section parse error' });
   }
 
+  // записываем дату
   weblancerProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
+  // заканчиваем работу nightmare и создаем его новый экзампляр
   await createNewNightmare({});
+  // записываем проекты в файл
   utils.writeFileSync('./db/weblancerProjects.json', JSON.stringify(weblancerProjects));
   // res.status(200).json(weblancerProjects);
 };
 
 // ? weblancerCheerio********************************************************************************
+// обходим страницы с помощью node-fetch и cheerio
 async function weblancerScrapCheerio($cheerio, url) {
+  // формируем массив объектов с нужными полями с одной страницы
   let all = $cheerio('.cols_table:not(.order-last) .click_container-link.set_href');
   // console.log(all);
 
@@ -483,6 +506,7 @@ async function weblancerScrapCheerio($cheerio, url) {
   return projects;
 }
 async function fetchUrl(url) {
+  // на данной бирже стоит кодировка win1251, поэтому переводим в utf-8
   let response = await fetch(url);
   response = await response.buffer();
   let data = iconv.decode(response, 'cp1251').toString();
@@ -496,11 +520,13 @@ exports.weblancerCheerio = async (req, res, next) => {
   let $;
   // на данной бирже стоит кодировка win1251, поэтому переводим в utf-8
   try {
+    // запрос на главную страницу
     $ = cheerio.load(await fetchUrl(url), { decodeEntities: false });
   } catch (error) {
     console.log(`weblancer fetch ${url} error`, error);
   }
 
+  // формируем ссылки на разделы
   let linksObjects = $('.index_categories .align-items-stretch:first-child .list-wide li a');
   linksObjects = linksObjects.slice(0, linksObjects.length - 1);
   let categoryLinks = [];
@@ -522,6 +548,7 @@ exports.weblancerCheerio = async (req, res, next) => {
       return;
     }
     try {
+      // запрос на страницу раздела
       $ = cheerio.load(await fetchUrl(categoryLinks[i].link), { normalizeWhitespace: true, decodeEntities: false });
     } catch (error) {
       console.log(`weblancer fetch ${categoryLinks[i].link} error`, error);
@@ -539,9 +566,11 @@ exports.weblancerCheerio = async (req, res, next) => {
     // пробегаемся по оставшимся страницам и собираем проекты
     let isNextDisabled = false;
     let isNextExists = !!$('.pagination_box').length;
+    // если больше страниц нет
     if (!isNextExists) {
       console.log('next disabled', true, 'next exists', isNextExists);
       console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
+      // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
       if (weblancerPrevProjects.projects[section] === undefined) {
         weblancerPrevProjects.projects[section] = resultProjects;
         weblancerPrevProjects.newProjects[section] = resultProjects;
@@ -555,6 +584,7 @@ exports.weblancerCheerio = async (req, res, next) => {
       continue;
     }
 
+    // собираем проекты пока существует следующая страница
     while (!isNextDisabled) {
       if (!canLoading) {
         return;
@@ -586,6 +616,7 @@ exports.weblancerCheerio = async (req, res, next) => {
     }
 
     console.log(`weblancer ${section} - ${resultProjects.length}`.bgGreen);
+    // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
     if (weblancerPrevProjects.projects[section] === undefined) {
       weblancerPrevProjects.projects[section] = resultProjects;
       weblancerPrevProjects.newProjects[section] = resultProjects;
@@ -597,13 +628,17 @@ exports.weblancerCheerio = async (req, res, next) => {
     weblancerProjects.projects[section] = resultProjects;
     resultProjects = [];
   }
+  // устанавливаем дату
   weblancerProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
+  // записываем db/*.json
   utils.writeFileSync('./db/weblancerProjects.json', JSON.stringify(weblancerProjects));
   // res.status(200).json(weblancerProjects);
 };
 
 // ? weblancerStart********************************************************************************
+// читаем проекты
 exports.weblancerProjectsRead = async (req, res, next) => {
+  // если cnt === 0, то отправляем клиенту количество массивов проектов
   if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(weblancerPrevProjects.projects).length, date: weblancerPrevProjects.date });
   let firstTime = req.query.firstTime;
 
@@ -614,6 +649,7 @@ exports.weblancerProjectsRead = async (req, res, next) => {
   let projectsArr;
   let deleted = null;
   let newProjects = null;
+  // если клиент впервые читает проекты
   if (firstTime === 'true') {
     if (weblancerPrevProjects.newProjects[arr].length || weblancerPrevProjects.deleted[arr].length) {
       newProjects = weblancerPrevProjects.newProjects[arr];
@@ -630,19 +666,24 @@ exports.weblancerProjectsRead = async (req, res, next) => {
   res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjects, newProjectsCleaned });
 };
 
+// начинаем загрузку
 let timeout;
 let firstTimeReadProjects = true;
 exports.weblancerStart = async (req, res, next) => {
   canLoading = true;
+  // если первый раз читаем проекты
   if (firstTimeReadProjects) {
     let fileExists = utils.fileExists('./db/weblancerProjects.json');
+    // если файл существует
     if (fileExists) {
       let projects = JSON.parse(utils.readFileSync('./db/weblancerProjects.json'));
+      // если файл пустой
       if (projects.projects === undefined) {
         weblancerPrevProjects.newProjects = {};
         weblancerPrevProjects.deleted = {};
         res.json({ start: true, message: 'file is empty' });
       } else {
+        // если файл существует и он не пуст
         weblancerPrevProjects = utils.deepCloneObject(projects);
         weblancerPrevProjects.newProjects = {};
         weblancerPrevProjects.deleted = {};
@@ -653,6 +694,7 @@ exports.weblancerStart = async (req, res, next) => {
         res.json({ start: true });
       }
     } else {
+      // если файл не существует
       weblancerPrevProjects.newProjects = {};
       weblancerPrevProjects.deleted = {};
       res.json({ start: true, message: 'file not exists' });
@@ -660,7 +702,9 @@ exports.weblancerStart = async (req, res, next) => {
     isLoading = true;
     firstTimeReadProjects = false;
   } else {
+    // если не первый раз читаем проекты
     if (isLoading) {
+      // если в данный момент идет загрузка (запущена с другого клиента, телеграм бота)
       return res.json({ start: true });
     }
     isLoading = true;
@@ -669,6 +713,7 @@ exports.weblancerStart = async (req, res, next) => {
 
   let cnt = 0;
 
+  // рекурсивная загрузка с интервалом
   const recursiveLoad = async () => {
     console.log('weblancer start load'.bgYellow);
     let loadFunction;
@@ -690,6 +735,7 @@ exports.weblancerStart = async (req, res, next) => {
       await loadFunction().then(() => {
         if (!canLoading) return;
         cnt++;
+        // обнуляем новые проекты
         if (cnt > 50) {
           cnt = 0;
           mergeProjects();
@@ -705,6 +751,7 @@ exports.weblancerStart = async (req, res, next) => {
   recursiveLoad();
 };
 
+// обнуляем новые проекты и удаленные, weblancerPrevProjects = weblancerProjects
 const mergeProjects = () => {
   Object.keys(weblancerPrevProjects.newProjects).forEach((proj) => {
     while (weblancerPrevProjects.newProjects[proj].length) {
@@ -724,6 +771,7 @@ const mergeProjects = () => {
 };
 
 // ? weblancerAbort********************************************************************************
+// прервать загрузку
 exports.weblancerAbort = async (req, res, next) => {
   clearTimeout(timeout);
   isLoading = false;

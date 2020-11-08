@@ -36,6 +36,7 @@ const url = 'https://freelancehunt.com';
 // flhunt********************************************************************************
 // flhunt********************************************************************************
 async function createNewNightmare({ msg, error, aborted }) {
+  // выводим ссобщения в консоль и заканчиваем работу nightmare и создаем его новый экземпляр
   if (msg) {
     console.log('message:', msg, 'err:', error);
   }
@@ -54,11 +55,13 @@ async function createNewNightmare({ msg, error, aborted }) {
   });
 }
 // ? flhuntLinksCheerio*************************************************************************
+// обходим страницы с помощью nightmare и cheerio
 async function flhuntScrapLinksCheerio($cheerio, url) {
   let all = $cheerio('table.project-list tbody tr:not(.featured)');
   let premium = $cheerio('table.project-list tbody tr.featured');
   // console.log(all);
 
+  // формируем массив объектов с нужными полями
   let projects = [];
 
   if (premium.length) {
@@ -109,6 +112,7 @@ async function flhuntScrapLinksCheerio($cheerio, url) {
 exports.flhuntLinksCheerio = async (req, res, next) => {
   let resultProjects = [];
   try {
+    // идем на страницу всех проектов
     await nightmare
       .goto(url + '/projects')
       .wait('table.project-list')
@@ -119,12 +123,14 @@ exports.flhuntLinksCheerio = async (req, res, next) => {
   }
 
   try {
+    // загружаем страницу в cheerio
     const data = await nightmare.evaluate(() => {
       return document.body.innerHTML;
     });
 
     let $ = cheerio.load(data, { normalizeWhitespace: true, decodeEntities: false });
 
+    // формируем массив ссылок
     let links = $('#skill-group-1 a')
       .map((i, el) => url + $(el).attr('href'))
       .get();
@@ -148,10 +154,11 @@ exports.flhuntLinksCheerio = async (req, res, next) => {
     });
     console.log(categoryLinks);
 
-    // пробегаемся по всем страницам раздела
+    // пробегаемся по всем страницам разделам
     for (let i = 0; i < categoryLinks.length; i++) {
       if (!canLoading) return;
 
+      // переходим на страницу раздела
       await nightmare.goto(categoryLinks[i].link).wait('table.project-list');
 
       const data = await nightmare.evaluate(() => {
@@ -169,12 +176,13 @@ exports.flhuntLinksCheerio = async (req, res, next) => {
         // return res.json({ error: true, message: `flhunt 1 page of ${section} parse error` });
       }
 
-      // пробегаемся по оставшимся страницам и собираем проекты
       let isNextDisabled = false;
       let isNextExists = $('.pagination li').length > 0;
+      // если страниц больше нет записываем результаты
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
         console.log(`flhunt ${section} - ${resultProjects.length}`.bgGreen);
+        // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
         if (flhuntPrevProjects.projects[section] === undefined) {
           flhuntPrevProjects.projects[section] = resultProjects;
           flhuntPrevProjects.newProjects[section] = resultProjects;
@@ -188,6 +196,8 @@ exports.flhuntLinksCheerio = async (req, res, next) => {
         continue;
       }
 
+      // пробегаемся по оставшимся страницам и собираем проекты
+      // пока есть следующая страница собираем проекты
       while (!isNextDisabled) {
         if (!canLoading) return;
 
@@ -216,6 +226,7 @@ exports.flhuntLinksCheerio = async (req, res, next) => {
       }
 
       console.log(`flhunt ${categoryLinks[i].title} - ${resultProjects.length}`.bgGreen);
+      // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
       if (flhuntPrevProjects.projects[section] === undefined) {
         flhuntPrevProjects.projects[section] = resultProjects;
         flhuntPrevProjects.newProjects[section] = resultProjects;
@@ -232,13 +243,18 @@ exports.flhuntLinksCheerio = async (req, res, next) => {
     // return res.json({ error: true, message: 'flhunt category links parse error' });
   }
 
+  // устанавливаем дату
   flhuntProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
+  // завершаем работу nightmare и создаем его новый экземпляр
   await createNewNightmare({});
+  // записываем проекты в файл
   utils.writeFileSync('./db/flhuntProjects.json', JSON.stringify(flhuntProjects));
   // res.status(200).json(flhuntProjects);
 };
 // ? flhuntLinks********************************************************************************
+// обходим страницы с помощью nightmare
 async function flhuntScrapLinks() {
+  // формируем массив объектов с нужными полями
   let projects = await nightmare.evaluate(() => {
     let all = [...document.querySelectorAll('table.project-list tbody tr:not(.featured)')];
     let premium = [...document.querySelectorAll('table.project-list tbody tr.featured')];
@@ -287,6 +303,7 @@ async function flhuntScrapLinks() {
 exports.flhuntLinks = async (req, res, next) => {
   let resultProjects = [];
 
+  // идем на страницу со всеми проектами
   try {
     await nightmare
       .goto(url + '/projects')
@@ -297,8 +314,8 @@ exports.flhuntLinks = async (req, res, next) => {
     // return res.json({ error: true, message: 'flhunt projects goto error' });
   }
 
-  // получаем ссылки на разделы
   try {
+    // получаем ссылки на разделы
     const categoryLinks = await nightmare.evaluate(() => {
       let links = [...document.querySelectorAll('#skill-group-1 a')].map((link) => link.href);
       let links2 = [...document.querySelectorAll('#skill-group-6 a')].map((link) => link.href);
@@ -321,11 +338,12 @@ exports.flhuntLinks = async (req, res, next) => {
 
     console.log(categoryLinks);
 
-    // пробегаемся по всем страницам раздела
+    // пробегаемся по всем страницам разделам
     let section = categoryLinks[i].title;
     for (let i = 0; i < categoryLinks.length; i++) {
       if (!canLoading) return;
 
+      // переходим на страницу раздела
       await nightmare.goto(categoryLinks[i].link).wait('table.project-list');
 
       // собираем проекты с первой страницы, мы на ней находимся
@@ -336,12 +354,13 @@ exports.flhuntLinks = async (req, res, next) => {
         // return res.json({ error: true, message: `flhunt 1 page of ${section} parse error` });
       }
 
-      // пробегаемся по оставшимся страницам и собираем проекты
       let isNextDisabled = false;
       let isNextExists = await nightmare.exists('.pagination li');
+      // если страниц больше нет записываем результаты
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
         console.log(`flhunt ${section} - ${resultProjects.length}`.bgGreen);
+        // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
         if (flhuntPrevProjects.projects[section] === undefined) {
           flhuntPrevProjects.projects[section] = resultProjects;
           flhuntPrevProjects.newProjects[section] = resultProjects;
@@ -355,6 +374,8 @@ exports.flhuntLinks = async (req, res, next) => {
         continue;
       }
 
+      // пробегаемся по оставшимся страницам и собираем проекты
+      // пока есть следующая страница собираем проекты
       while (!isNextDisabled) {
         if (!canLoading) return;
 
@@ -380,6 +401,7 @@ exports.flhuntLinks = async (req, res, next) => {
       }
 
       console.log(`flhunt ${section} - ${resultProjects.length}`.bgGreen);
+      // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
       if (flhuntPrevProjects.projects[section] === undefined) {
         flhuntPrevProjects.projects[section] = resultProjects;
         flhuntPrevProjects.newProjects[section] = resultProjects;
@@ -396,24 +418,30 @@ exports.flhuntLinks = async (req, res, next) => {
     // return res.json({ error: true, message: 'flhunt category links parse error' });
   }
 
+  // устанавливаем дату
   flhuntProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
+  // завершаем работу nightmare и создаем его новый экземпляр
   await createNewNightmare({});
+  // записываем проекты в файл
   utils.writeFileSync('./db/flhuntProjects.json', JSON.stringify(flhuntProjects));
   // res.status(200).json(flhuntProjects);
 };
 
 // ? flhuntClick**************************************************************************
+// обходим страницы с помощью nightmare по средствам кликов на ссылки
 async function flhuntScrapClick(section) {
   let isNextDisabled = false;
   let isNextExists = await nightmare.exists('.pagination li');
   let resultProjects = [];
 
+  // пока есть следующая страница собираем проекты
   while (!isNextDisabled) {
     if (!canLoading) return;
 
     !isNextExists ? (isNextDisabled = true) : (isNextDisabled = await nightmare.exists('.pagination ul li:last-child.disabled'));
     console.log('next disabled', isNextDisabled, 'next exists', isNextExists);
 
+    // формируем массив объектов с нужными полями
     let projects = await nightmare.wait('table.project-list').evaluate(() => {
       let all = [...document.querySelectorAll('table.project-list tbody tr:not(.featured)')];
       let premium = [...document.querySelectorAll('table.project-list tbody tr.featured')];
@@ -464,11 +492,13 @@ async function flhuntScrapClick(section) {
 
     projects = [];
 
+    // если есть следующая страница то переходим на нее
     if (isNextExists && !isNextDisabled) await nightmare.click('.pagination li > a[rel="next"]').wait('table.project-list').wait(1000);
   }
 
   // console.dir(resultProjects, { depth: null });
   console.log(`flhunt ${section} - ${resultProjects.length}`.bgGreen);
+  // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
   if (flhuntPrevProjects.projects[section] === undefined) {
     flhuntPrevProjects.projects[section] = resultProjects;
     flhuntPrevProjects.newProjects[section] = resultProjects;
@@ -582,7 +612,9 @@ exports.flhuntClick = async (req, res, next) => {
 };
 
 // ? flhuntStart**************************************************************************
+// читаем проекты
 exports.flhuntProjectsRead = async (req, res, next) => {
+  // если cnt === 0, то отправляем клиенту количество массивов проектов
   if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(flhuntPrevProjects.projects).length, date: flhuntPrevProjects.date });
   let firstTime = req.query.firstTime;
 
@@ -593,6 +625,7 @@ exports.flhuntProjectsRead = async (req, res, next) => {
   let projectsArr;
   let deleted = null;
   let newProjects = null;
+  // если клиент впервые читает проекты
   if (firstTime === 'true') {
     if (flhuntPrevProjects.newProjects[arr].length || flhuntPrevProjects.deleted[arr].length) {
       newProjects = flhuntPrevProjects.newProjects[arr];
@@ -610,20 +643,24 @@ exports.flhuntProjectsRead = async (req, res, next) => {
   res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjects, newProjectsCleaned });
 };
 
+// начинаем загрузку
 let timeout;
 let firstTimeReadProjects = true;
 exports.flhuntStart = async (req, res, next) => {
   canLoading = true;
-
+  // если первый раз читаем проекты
   if (firstTimeReadProjects) {
     let fileExists = utils.fileExists('./db/flhuntProjects.json');
+    // если файл существует
     if (fileExists) {
       let projects = JSON.parse(utils.readFileSync('./db/flhuntProjects.json'));
+      // если файл пустой
       if (projects.projects === undefined) {
         flhuntPrevProjects.newProjects = {};
         flhuntPrevProjects.deleted = {};
         res.json({ start: true, message: 'file is empty' });
       } else {
+        // если файл существует и он не пуст
         flhuntPrevProjects = utils.deepCloneObject(projects);
         flhuntPrevProjects.newProjects = {};
         flhuntPrevProjects.deleted = {};
@@ -634,6 +671,7 @@ exports.flhuntStart = async (req, res, next) => {
         res.json({ start: true });
       }
     } else {
+      // если файл не существует
       flhuntPrevProjects.newProjects = {};
       flhuntPrevProjects.deleted = {};
       res.json({ start: true, message: 'file not exists' });
@@ -641,7 +679,9 @@ exports.flhuntStart = async (req, res, next) => {
     isLoading = true;
     firstTimeReadProjects = false;
   } else {
+    // если не первый раз читаем проекты
     if (isLoading) {
+      // если в данный момент идет загрузка (запущена с другого клиенты, телеграм бота)
       return res.json({ start: true });
     }
     isLoading = true;
@@ -650,6 +690,7 @@ exports.flhuntStart = async (req, res, next) => {
 
   let cnt = 0;
 
+  // рекурсивная загрузка с интервалом
   const recursiveLoad = async () => {
     console.log('flhunt start load'.bgYellow);
     let loadFunction;
@@ -671,6 +712,7 @@ exports.flhuntStart = async (req, res, next) => {
       await loadFunction().then(() => {
         if (!canLoading) return;
         cnt++;
+        // обнуляем новые проекты
         if (cnt > 50) {
           cnt = 0;
           mergeProjects();
@@ -686,6 +728,7 @@ exports.flhuntStart = async (req, res, next) => {
   recursiveLoad();
 };
 
+// обнуляем новые проекты и удаленные, freelanceruPrevProjects = freelanceruProjects
 const mergeProjects = () => {
   Object.keys(flhuntPrevProjects.newProjects).forEach((proj) => {
     while (flhuntPrevProjects.newProjects[proj].length) {
@@ -704,6 +747,7 @@ const mergeProjects = () => {
   newProjectsCleaned = true;
 };
 // ? flhuntAbort********************************************************************************
+// прервать загрузку
 exports.flhuntAbort = async (req, res, next) => {
   clearTimeout(timeout);
   isLoading = false;

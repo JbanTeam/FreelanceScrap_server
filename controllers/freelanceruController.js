@@ -34,6 +34,7 @@ let canLoading;
 // freelance-ru********************************************************************************
 // freelance-ru********************************************************************************
 async function createNewNightmare({ msg, error, aborted }) {
+  // выводим ссобщения в консоль и заканчиваем работу nightmare и создаем его новый экземпляр
   if (msg) {
     console.log('message:', msg, 'err:', error);
   }
@@ -52,10 +53,12 @@ async function createNewNightmare({ msg, error, aborted }) {
   });
 }
 // ? freelanceruLinksCheerio*******************************************************************************************
+// обходим страницы с помощью nightmare и cheerio
 async function freelanceruScrapLinksCheerio($cheerio, url) {
   let all = $cheerio('.projects.projects-filtered .proj');
   // console.log(all);
 
+  // формируем массив объектов с нужными полями
   let projects = [];
 
   if (all.length) {
@@ -92,6 +95,7 @@ async function freelanceruScrapLinksCheerio($cheerio, url) {
 exports.freelanceruLinksCheerio = async (req, res, next) => {
   let resultProjects = [];
   const url = 'https://freelance.ru';
+  // заранее формируем массив ссылок и названий разделов
   const categoryLinks = [
     {
       title: 'webprog',
@@ -109,8 +113,10 @@ exports.freelanceruLinksCheerio = async (req, res, next) => {
       if (!canLoading) {
         return;
       }
+      // идем в раздел
       await nightmare.goto(categoryLinks[i].link).wait('.projects.projects-filtered').wait(1000);
 
+      // загружаем страницу в cheerio
       const data = await nightmare.evaluate(() => {
         return document.body.innerHTML;
       });
@@ -126,12 +132,13 @@ exports.freelanceruLinksCheerio = async (req, res, next) => {
         // return res.json({ error: true, message: `freelanceru 1 page of ${categoryLinks[i]} parse error` });
       }
 
-      // пробегаемся по оставшимся страницам и собираем проекты
       let isNextDisabled = false;
       let isNextExists = !!$('.pagination').length;
+      // если страниц больше нет записываем результаты
       if (!isNextExists) {
         console.log('next disabled', true, 'next exists', isNextExists);
         console.log(`freelanceru ${section} - ${resultProjects.length}`.bgGreen);
+        // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
         if (freelanceruPrevProjects.projects[section] === undefined) {
           freelanceruPrevProjects.projects[section] = resultProjects;
           freelanceruPrevProjects.newProjects[section] = resultProjects;
@@ -145,6 +152,8 @@ exports.freelanceruLinksCheerio = async (req, res, next) => {
         continue;
       }
 
+      // пробегаемся по оставшимся страницам и собираем проекты
+      // пока есть следующая страница собираем проекты
       while (!isNextDisabled) {
         if (!canLoading) {
           return;
@@ -174,6 +183,7 @@ exports.freelanceruLinksCheerio = async (req, res, next) => {
       }
 
       console.log(`freelanceru ${section} - ${resultProjects.length}`.bgGreen);
+      // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
       if (freelanceruPrevProjects.projects[section] === undefined) {
         freelanceruPrevProjects.projects[section] = resultProjects;
         freelanceruPrevProjects.newProjects[section] = resultProjects;
@@ -190,13 +200,18 @@ exports.freelanceruLinksCheerio = async (req, res, next) => {
     // return res.json({ error: true, message: `freelanceru category links goto error` });
   }
 
+  // устанавливаем дату
   freelanceruProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
+  // завершаем работу nightmare и создаем его новый экземпляр
   await createNewNightmare({});
+  // записываем проекты в файл
   utils.writeFileSync('./db/freelanceruProjects.json', JSON.stringify(freelanceruProjects));
 };
 
 // ? freelanceruStart*******************************************************************************************
+// читаем проекты
 exports.freelanceruProjectsRead = async (req, res, next) => {
+  // если cnt === 0, то отправляем клиенту количество массивов проектов
   if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(freelanceruPrevProjects.projects).length, date: freelanceruPrevProjects.date });
   let firstTime = req.query.firstTime;
 
@@ -207,6 +222,7 @@ exports.freelanceruProjectsRead = async (req, res, next) => {
   let projectsArr;
   let deleted = null;
   let newProjects = null;
+  // если клиент впервые читает проекты
   if (firstTime === 'true') {
     if (freelanceruPrevProjects.newProjects[arr].length || freelanceruPrevProjects.deleted[arr].length) {
       newProjects = freelanceruPrevProjects.newProjects[arr];
@@ -224,20 +240,24 @@ exports.freelanceruProjectsRead = async (req, res, next) => {
   res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjects, newProjectsCleaned });
 };
 
+// начинаем загрузку
 let timeout;
 let firstTimeReadProjects = true;
 exports.freelanceruStart = async (req, res, next) => {
   canLoading = true;
-
+  // если первый раз читаем проекты
   if (firstTimeReadProjects) {
     let fileExists = utils.fileExists('./db/freelanceruProjects.json');
+    // если файл существует
     if (fileExists) {
       let projects = JSON.parse(utils.readFileSync('./db/freelanceruProjects.json'));
+      // если файл пустой
       if (projects.projects === undefined) {
         freelanceruPrevProjects.newProjects = {};
         freelanceruPrevProjects.deleted = {};
         res.json({ start: true, message: 'file is empty' });
       } else {
+        // если файл существует и он не пуст
         freelanceruPrevProjects = utils.deepCloneObject(projects);
         freelanceruPrevProjects.newProjects = {};
         freelanceruPrevProjects.deleted = {};
@@ -248,6 +268,7 @@ exports.freelanceruStart = async (req, res, next) => {
         res.json({ start: true });
       }
     } else {
+      // если файл не существует
       freelanceruPrevProjects.newProjects = {};
       freelanceruPrevProjects.deleted = {};
       res.json({ start: true, message: 'file not exists' });
@@ -255,7 +276,9 @@ exports.freelanceruStart = async (req, res, next) => {
     isLoading = true;
     firstTimeReadProjects = false;
   } else {
+    // если не первый раз читаем проекты
     if (isLoading) {
+      // если в данный момент идет загрузка (запущена с другого клиенты, телеграм бота)
       return res.json({ start: true });
     }
     isLoading = true;
@@ -264,12 +287,14 @@ exports.freelanceruStart = async (req, res, next) => {
 
   let cnt = 0;
 
+  // рекурсивная загрузка с интервалом
   const recursiveLoad = async () => {
     console.log('freelanceru start load'.bgYellow);
     try {
       await this.freelanceruLinksCheerio().then(() => {
         if (!canLoading) return;
         cnt++;
+        // обнуляем новые проекты
         if (cnt > 50) {
           cnt = 0;
           mergeProjects();
@@ -285,6 +310,7 @@ exports.freelanceruStart = async (req, res, next) => {
   recursiveLoad();
 };
 
+// обнуляем новые проекты и удаленные, freelanceruPrevProjects = freelanceruProjects
 const mergeProjects = () => {
   Object.keys(freelanceruPrevProjects.newProjects).forEach((proj) => {
     while (freelanceruPrevProjects.newProjects[proj].length) {
@@ -304,6 +330,7 @@ const mergeProjects = () => {
 };
 
 // ? freelanceruAbort********************************************************************************
+// прервать загрузку
 exports.freelanceruAbort = async (req, res, next) => {
   clearTimeout(timeout);
   isLoading = false;

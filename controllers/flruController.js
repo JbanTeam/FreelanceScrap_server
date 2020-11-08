@@ -34,6 +34,7 @@ let canLoading;
 // ! ************************************************************************
 // fl-ru***********************************************************
 async function createNewNightmare({ msg, error, aborted }) {
+  // выводим ссобщения в консоль и заканчиваем работу nightmare и создаем его новый экземпляр
   if (msg) {
     console.log('message:', msg, 'err:', error);
   }
@@ -52,10 +53,12 @@ async function createNewNightmare({ msg, error, aborted }) {
   });
 }
 // ? flruClickCheerio*********************************************************
+// обходим страницы с помощью nightmare и cheerio (не собираем ссылки, а кликаем на них, так как на данной бирже на фронет SPA)
 async function flruClickCheerioObjects($cheerio, url) {
   let all = $cheerio('#projects-list .b-post');
   // console.log(all);
 
+  // формируем массив объектов с нужными полями
   let projects = [];
 
   if (all.length) {
@@ -106,6 +109,7 @@ async function flruClickCheerioObjects($cheerio, url) {
 async function flruScrapClickCheerio(section, url) {
   let resultProjects = [];
 
+  // загружаем страницу в cheerio
   const data = await nightmare.evaluate(() => {
     return document.body.innerHTML;
   });
@@ -118,13 +122,15 @@ async function flruScrapClickCheerio(section, url) {
   } catch (error) {
     console.log('message', 'first page parse error', 'err', error);
   }
-  // пробегаемся по оставшимся страницам и собираем проекты
+
   let isNextDisabled = false;
   let isNextExists = !!$('.b-pager__list').length;
   let pageCount = 1;
+  // если страниц больше нет записываем результаты
   if (!isNextExists) {
     console.log('next disabled', true, 'next exists', isNextExists);
     console.log(`flru ${section} - ${resultProjects.length}`.bgGreen);
+    // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
     if (flruPrevProjects.projects[section] === undefined) {
       flruPrevProjects.projects[section] = resultProjects;
       flruPrevProjects.newProjects[section] = resultProjects;
@@ -136,6 +142,8 @@ async function flruScrapClickCheerio(section, url) {
     flruProjects.projects[section] = resultProjects;
   }
 
+  // пробегаемся по оставшимся страницам и собираем проекты
+  // пока есть следующая страница собираем проекты
   while (!isNextDisabled) {
     if (!canLoading) {
       return;
@@ -149,11 +157,14 @@ async function flruScrapClickCheerio(section, url) {
 
     if (!isNextExists || isNextDisabled) break;
 
+    // формируем ссылку на следующую страницу
     let nextLink = `${url}/projects${$('.b-pager__list li.b-pager__item_active + li a').attr('href')}`;
     console.log(nextLink);
 
+    // если есть следующая страница то переходим на нее
     if (isNextExists && !isNextDisabled) await nightmare.goto(nextLink).wait('.b-post').wait('#pf_specs .b-ext-filter__krest').wait(1000);
 
+    // загружаем страницу в cheerio
     const data = await nightmare.evaluate(() => {
       return document.body.innerHTML;
     });
@@ -168,6 +179,7 @@ async function flruScrapClickCheerio(section, url) {
   }
 
   console.log(`flru ${section} - ${resultProjects.length}`.bgGreen);
+  // если массив соответсвующего раздела undefined (происходит если db/*.json не существует или пуст)
   if (flruPrevProjects.projects[section] === undefined) {
     flruPrevProjects.projects[section] = resultProjects;
     flruPrevProjects.newProjects[section] = resultProjects;
@@ -182,7 +194,7 @@ async function flruScrapClickCheerio(section, url) {
 exports.flruClickCheerio = async () => {
   const url = 'https://www.fl.ru';
 
-  // web-programming***********************************
+  // идем в раздел web-programming***********************************
   try {
     await nightmare
       .goto(url + '/projects')
@@ -206,7 +218,7 @@ exports.flruClickCheerio = async () => {
     // return res.json({ error: true, message: 'flru webprog section parse error' });
   }
 
-  // html*********************************************
+  // идем в раздел html*********************************************
   try {
     await nightmare
       .click('#pf_specs .b-ext-filter__krest')
@@ -230,7 +242,7 @@ exports.flruClickCheerio = async () => {
     // return res.json({ error: true, message: 'flru html section parse error' });
   }
 
-  // сайт под ключ*********************************************
+  // идем в раздел сайт под ключ*********************************************
   try {
     await nightmare
       .click('#pf_specs .b-ext-filter__krest')
@@ -254,7 +266,7 @@ exports.flruClickCheerio = async () => {
     // return res.json({ error: true, message: 'flru wholesite section parse error' });
   }
 
-  // Cms*********************************************
+  // идем в раздел Cms*********************************************
   try {
     await nightmare
       .click('#pf_specs .b-ext-filter__krest')
@@ -278,7 +290,7 @@ exports.flruClickCheerio = async () => {
     // return res.json({ error: true, message: 'flru cms section parse error' });
   }
 
-  // интернет магазины*********************************************
+  // идем в раздел интернет магазины*********************************************
   try {
     await nightmare
       .click('#pf_specs .b-ext-filter__krest')
@@ -302,13 +314,18 @@ exports.flruClickCheerio = async () => {
     // return res.json({ error: true, message: 'flru inetshop section parse error' });
   }
 
+  // формируем дату
   flruProjects['date'] = moment().format('DD-MM-YYYY / HH:mm:ss');
+  // завершаем работу nightmare и создаем его новый экземпляр
   await createNewNightmare({});
+  // записываем проекты в файл
   utils.writeFileSync('./db/flruProjects.json', JSON.stringify(flruProjects));
 };
 
 // ? flruStart*************************************************************************
+// читаем проекты
 exports.flruProjectsRead = async (req, res, next) => {
+  // если cnt === 0, то отправляем клиенту количество массивов проектов
   if (+req.query.cnt === 0) return res.json({ cnt: Object.keys(flruPrevProjects.projects).length, date: flruPrevProjects.date });
   let firstTime = req.query.firstTime;
 
@@ -319,6 +336,7 @@ exports.flruProjectsRead = async (req, res, next) => {
   let projectsArr;
   let deleted = null;
   let newProjects = null;
+  // если клиент впервые читает проекты
   if (firstTime === 'true') {
     if (flruPrevProjects.newProjects[arr].length || flruPrevProjects.deleted[arr].length) {
       newProjects = flruPrevProjects.newProjects[arr];
@@ -336,20 +354,24 @@ exports.flruProjectsRead = async (req, res, next) => {
   res.json({ cnt: cnt - 1, [arr]: projectsArr, arrName: arr, deleted, newProjects, newProjectsCleaned });
 };
 
+// начинаем загрузку
 let timeout;
 let firstTimeReadProjects = true;
 exports.flruStart = async (req, res, next) => {
   canLoading = true;
-
+  // если первый раз читаем проекты
   if (firstTimeReadProjects) {
     let fileExists = utils.fileExists('./db/flruProjects.json');
+    // если файл существует
     if (fileExists) {
       let projects = JSON.parse(utils.readFileSync('./db/flruProjects.json'));
+      // если файл пустой
       if (projects.projects === undefined) {
         flruPrevProjects.newProjects = {};
         flruPrevProjects.deleted = {};
         res.json({ start: true, message: 'file is empty' });
       } else {
+        // если файл существует и он не пуст
         flruPrevProjects = utils.deepCloneObject(projects);
         flruPrevProjects.newProjects = {};
         flruPrevProjects.deleted = {};
@@ -360,6 +382,7 @@ exports.flruStart = async (req, res, next) => {
         res.json({ start: true });
       }
     } else {
+      // если файл не существует
       flruPrevProjects.newProjects = {};
       flruPrevProjects.deleted = {};
       res.json({ start: true, message: 'file not exists' });
@@ -367,7 +390,9 @@ exports.flruStart = async (req, res, next) => {
     isLoading = true;
     firstTimeReadProjects = false;
   } else {
+    // если не первый раз читаем проекты
     if (isLoading) {
+      // если в данный момент идет загрузка (запущена с другого клиенты, телеграм бота)
       return res.json({ start: true });
     }
     isLoading = true;
@@ -376,12 +401,14 @@ exports.flruStart = async (req, res, next) => {
 
   let cnt = 0;
 
+  // рекурсивная загрузка с интервалом
   const recursiveLoad = async () => {
     console.log('flru start load'.bgYellow);
     try {
       await this.flruClickCheerio().then(() => {
         if (!canLoading) return;
         cnt++;
+        // обнуляем новые проекты
         if (cnt > 50) {
           cnt = 0;
           mergeProjects();
@@ -397,6 +424,7 @@ exports.flruStart = async (req, res, next) => {
   recursiveLoad();
 };
 
+// обнуляем новые проекты и удаленные, freelanceruPrevProjects = freelanceruProjects
 const mergeProjects = () => {
   Object.keys(flruPrevProjects.newProjects).forEach((proj) => {
     while (flruPrevProjects.newProjects[proj].length) {
@@ -415,6 +443,7 @@ const mergeProjects = () => {
   newProjectsCleaned = true;
 };
 // ? flruAbort********************************************************************************
+// прервать загрузку
 exports.flruAbort = async (req, res, next) => {
   clearTimeout(timeout);
   isLoading = false;

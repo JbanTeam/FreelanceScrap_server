@@ -3,6 +3,7 @@ const Scene = require('telegraf/scenes/base');
 
 const utils = require('../utils');
 
+// функция рисующая меню разделов
 const projectsToButtons = (fl, allProjects, sections) => {
   return Extra.HTML().markup((m) =>
     m.inlineKeyboard([
@@ -20,6 +21,7 @@ const projectsToButtons = (fl, allProjects, sections) => {
   );
 };
 
+// перерисовываем меню разделов
 const updateProjectsButtons = async (ctx, fl, sections, allProjects) => {
   const { curScene } = ctx.scene.state;
   let html = `
@@ -34,6 +36,7 @@ const updateProjectsButtons = async (ctx, fl, sections, allProjects) => {
   await ctx.telegram.editMessageReplyMarkup(chat_id, msg_id, undefined, projectsToButtons(fl, allProjects, sections).reply_markup);
 };
 
+// функция рисующая пагинацию для отерытых проектов
 const pagination = (ctx, sec, curPage, pageCnt, clicked) => {
   // похоже что для button data установлен лимит строки по символам
   let { fl, sections, allProjects } = ctx.scene.state;
@@ -56,6 +59,7 @@ const pagination = (ctx, sec, curPage, pageCnt, clicked) => {
   );
 };
 
+// рисуем открытые проекты, пагинацию
 const paginationController = async (ctx, sec, curPage, update, clicked = 'all') => {
   let { fl, sections, allProjects, curScene } = ctx.scene.state;
   let { projects, newProjects } = allProjects;
@@ -95,6 +99,7 @@ const paginationController = async (ctx, sec, curPage, update, clicked = 'all') 
   }
 };
 
+// очищаем сцену
 const sceneCleaner = () => async (ctx) => {
   ctx.scene.state.messages.forEach(({ message_id: id }) => {
     try {
@@ -115,6 +120,7 @@ class FreelanceScenes {
     this.curPageNew = 0;
     this.ctx = null;
   }
+  // если есть новые проекты, то перерисовываем меню разделов и открытые проекты
   newProjectsExists = async () => {
     const { fl, sections, allProjects } = this.ctx.scene.state;
 
@@ -123,8 +129,10 @@ class FreelanceScenes {
       await paginationController(this.ctx, this.curSec, this.curPage, true, this.curProjects);
     }
   };
+  // сцена
   freelanceScene() {
     const freelance = new Scene('freelance');
+    // при заходе на сцену
     freelance
       .enter(async (ctx) => {
         this.ctx = ctx;
@@ -144,19 +152,24 @@ class FreelanceScenes {
 
         eventEmitter.on('new-projects', this.newProjectsExists);
       })
+      // когда покидаем сцену, то очищаем ее
       .leave(sceneCleaner());
 
+    // при событии нажатия на кнопки меню
     freelance.on('callback_query', async (ctx) => {
       const { fl, sections, curScene, allProjects, eventEmitter } = ctx.scene.state;
       let { type, sec, cnt } = JSON.parse(ctx.callbackQuery.data);
 
+      // типы кнопок
       switch (type) {
+        // кнопки fl и abort относятся к главной сцене, поэтому, если мы на сцене биржи то при нажатии на них выводим сообщение, что мы находимся не на той сцене
         case 'fl':
           await ctx.answerCbQuery('You are not on main scene. First quit from freelance scene.');
           break;
         case 'abort':
           await ctx.answerCbQuery('You are not on main scene. First quit from freelance scene.');
           break;
+        // кнопка раздела, при нажатии откроются проекты данного раздела
         case 'sec':
           // console.log(`${curScene.val.toUpperCase()} ${sections[sec]} btn clicked`);
           if (this.curSec === sec) {
@@ -177,6 +190,7 @@ class FreelanceScenes {
           await ctx.answerCbQuery(`${sections[sec]} section opened.`);
           this.curSec = sec;
           break;
+        // кнопка пагинации предыдущая страница
         case 'prev':
           if (this.curPage <= 0) {
             await ctx.answerCbQuery('You are on first page.');
@@ -186,6 +200,7 @@ class FreelanceScenes {
             await paginationController(ctx, sec, this.curPage, true, this.curProjects);
           }
           break;
+        // кнопка пагинации слудующая страница
         case 'next':
           if (this.curPage >= cnt - 1) {
             await ctx.answerCbQuery('You are on last page.');
@@ -195,19 +210,23 @@ class FreelanceScenes {
             await paginationController(ctx, sec, this.curPage, true, this.curProjects);
           }
           break;
+        // кнопка текущая страница/всего страниц (информационная)
         case 'cnt':
           await ctx.answerCbQuery('current page/total pages');
           break;
+        // фильтр проектов, при нажатии на кнопку all отобразятся все проекты
         case 'all':
           this.curProjects = 'all';
           this.curPage = this.curPageAll;
           await paginationController(ctx, sec, this.curPage, true);
           break;
+        // фильтр проектов, при нажатии на кнопку new отобразятся новые проекты
         case 'new':
           this.curProjects = 'new';
           this.curPage = this.curPageNew;
           await paginationController(ctx, sec, this.curPage, true, 'new');
           break;
+        // сбросить новые проекты
         case 'resnew':
           let section = sections[this.curSec];
           while (allProjects.newProjects[section].length) {
@@ -222,6 +241,7 @@ class FreelanceScenes {
           await updateProjectsButtons(ctx, fl, sections, allProjects);
           await paginationController(ctx, sec, this.curPage, true);
           break;
+        // выйти из текущей сцены на главную
         case 'quit':
           await ctx.answerCbQuery(`You are in main scene.`);
           await ctx.scene.leave();

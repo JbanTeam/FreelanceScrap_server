@@ -52,6 +52,7 @@ const freelanceArr = {
     title: 'Weblancer',
     isl: false,
     timeout: null,
+    firstLoad: true,
     sec: {
       wp: 'webprog',
       ht: 'html',
@@ -64,6 +65,7 @@ const freelanceArr = {
     title: 'Flhunt',
     isl: false,
     timeout: null,
+    firstLoad: true,
     sec: {
       ht: 'html',
       js: 'javascript',
@@ -75,6 +77,7 @@ const freelanceArr = {
   fb: {
     title: 'Flhabr',
     isl: false,
+    firstLoad: true,
     timeout: null,
     sec: {
       wh: 'wholesite',
@@ -87,6 +90,7 @@ const freelanceArr = {
   fr: {
     title: 'Freelanceru',
     isl: false,
+    firstLoad: true,
     timeout: null,
     sec: {
       wp: 'webprog',
@@ -96,6 +100,7 @@ const freelanceArr = {
   fl: {
     title: 'Flru',
     isl: false,
+    firstLoad: true,
     timeout: null,
     sec: {
       wp: 'webprog',
@@ -114,8 +119,7 @@ let curScene = {
   val: null,
 };
 
-let firstLoad = true;
-
+// формируем меню кнопок
 const menu = (freelanceArr) => {
   let html = `
   <b>To start loading click on button 🔥🔥🔥🔥🔥🔥🔥</b>
@@ -172,9 +176,11 @@ No stock market in progress.
   };
 };
 
+// записываем объекты проектов
 const setProjects = (flLower, arrName, projects, newPrjcts, deleted) => {
   allProjects[`${flLower}Projects`].projects[arrName] = projects.map((obj) => Object.assign({}, obj));
   let newExists = false;
+  // newPrjcts появляются, если на сервере нет файла db/*.json или он пуст
   if (newPrjcts !== null) {
     let newProjects = allProjects[`${flLower}Projects`].newProjects;
     let newProjectsAll = allProjects[`${flLower}Projects`].newProjectsAll;
@@ -182,12 +188,14 @@ const setProjects = (flLower, arrName, projects, newPrjcts, deleted) => {
     newProjects[arrName] = newPrjcts.map((proj) => Object.assign({}, proj));
     newProjectsAll[arrName] = newPrjcts.map((proj) => proj.link);
     newExists = true;
-
+    // если есть новые, то добавляем их к основным
     addToProjects(flLower, arrName, newPrjcts, deleted);
   }
+  // возвращаем флаг "есть ли новые проекты"
   return newExists;
 };
 
+// добавляем новые проекты в объект newProjects и к основным проектам, удаляем из основных проектов те, которых больше нет на бирже
 const addNewProjects = (flLower, arrName, projects, deleted) => {
   let newExists = false;
   if (projects.length) {
@@ -207,11 +215,14 @@ const addNewProjects = (flLower, arrName, projects, deleted) => {
       }
     }
   }
+  // если есть новые, то добавляем их к основным
   addToProjects(flLower, arrName, projects, deleted);
 
+  // возвращаем флаг "есть ли новые проекты"
   return newExists;
 };
 
+// удаляем все новые проекты(ссылки на них) из массива соответствующего раздела объекта newProjectsAll если в массиве соответсвующего раздела объекта newProjects нет проектов, и оставляем те ссылки, которые имеются в массиве соответсвующего раздела объектв newProjects
 const resetNewProjectsAll = (flLower, arrName) => {
   let newProjects = allProjects[`${flLower}Projects`].newProjects;
   let newProjectsAll = allProjects[`${flLower}Projects`].newProjectsAll;
@@ -221,6 +232,7 @@ const resetNewProjectsAll = (flLower, arrName) => {
   }
 };
 
+// добавляем новые проекты к основным, удаляем те которых больше нет на бирже
 const addToProjects = (flLower, arrName, projects, deleted) => {
   if (deleted && deleted.length) {
     allProjects[`${flLower}Projects`].projects[arrName] = allProjects[`${flLower}Projects`].projects[arrName].filter((proj) => {
@@ -237,6 +249,7 @@ const addToProjects = (flLower, arrName, projects, deleted) => {
   }
 };
 
+// начинаем загрузку
 const startLoading = async (flLower) => {
   let type;
   switch (flLower) {
@@ -265,7 +278,9 @@ const startLoading = async (flLower) => {
   }
 };
 
+// читаем проекты
 const projectsRead = async (ctx, fl, flLower, firstTime) => {
+  // в query пробрасываем firstTime - первый раз клиент читает проекты или нет
   let response = await axiosInstance.get(`/api/${flLower}-projects?cnt=0&firstTime=${firstTime}`);
 
   let cnt = response.data.cnt;
@@ -281,31 +296,41 @@ const projectsRead = async (ctx, fl, flLower, firstTime) => {
 
     let arrName = projects.data.arrName;
 
+    // если первый раз
     if (firstTime) {
+      // записываем проекты
       let res = setProjects(flLower, arrName, projects.data[arrName], projects.data.newProjects, projects.data.deleted);
+      // присутствуют ли новые проекты
       if (!newExists) newExists = res;
     } else {
+      // если не первый раз
       if (projects.data[arrName].length || projects.data.deleted.length) {
+        // если есть новые проекты или удаленные
         let res = addNewProjects(flLower, arrName, projects.data[arrName], projects.data.deleted);
         if (!newExists) newExists = res;
       } else {
+        // если нет новых или удаленных, смотрим флаг не прпоизошла ли очистка всех новых проектов на сервере, если да, то чистим и тут
         if (projects.data.newProjectsCleaned) resetNewProjectsAll(flLower, arrName);
       }
     }
   }
 
+  // если новые присутствуют, то обновляем кнопки и отсылаем сообщение о том, что новые есть
   if (newExists) {
     await updateFreelanceBtns(ctx);
     await ctx.telegram.sendMessage(chat_id, `${flLower.toUpperCase()} has new projects! 🔥🔥🔥`);
 
+    // пробрасываем событие в tg-scene.js о том что есть новые
     eventEmitter.emit('new-projects');
   }
 
+  // запускаем таймер для обновления информации о новых проектах на соответсвующей бирже
   freelanceArr[fl].timeout = setTimeout(async () => {
-    await projectsRead(ctx, fl, flLower, firstLoad);
+    await projectsRead(ctx, fl, flLower, freelanceArr[fl].firstLoad);
   }, 60000 * 3);
 };
 
+// прерываем загрузку на сервере
 const abortLoading = async (ctx, fl) => {
   try {
     let flLower = freelanceArr[fl].title.toLowerCase();
@@ -313,8 +338,9 @@ const abortLoading = async (ctx, fl) => {
 
     freelanceArr[fl].isl = false;
     clearTimeout(freelanceArr[fl].timeout);
-
+    // обновляем кнопки
     await updateFreelanceBtns(ctx);
+    // отсылаем сообщение о том что загрузка прервана
     await ctx.answerCbQuery(`${flLower.toUpperCase()} loading aborted.`);
   } catch (error) {
     freelanceArr[fl].isl = false;
@@ -323,28 +349,33 @@ const abortLoading = async (ctx, fl) => {
   }
 };
 
+// обновляем кнопки
 const updateFreelanceBtns = async (ctx) => {
   let menuObj = menu(freelanceArr);
-
+  // обновляем существующее меню
   await ctx.telegram.editMessageText(chat_id, menu_msg_id, undefined, menuObj.inProgress, { parse_mode: 'HTML', disable_web_page_preview: true });
   await ctx.telegram.editMessageReplyMarkup(chat_id, menu_msg_id, undefined, menuObj.extra.reply_markup);
 };
 
+// клик по кнопке соответсвующей биржи
 const freelanceBtnClick = async (ctx, fl, isLoading) => {
   if (!isLoading) freelanceArr[fl].isl = true;
 
   let flLower = freelanceArr[fl].title.toLowerCase();
 
+  // обновляем меню кнопок
   await updateFreelanceBtns(ctx);
 
+  // если не идет загрузка соответствующей биржи, то запускаем
   if (!isLoading) {
     let response = await startLoading(flLower);
     if (response.data.start) {
       await ctx.replyWithHTML(`Starts loading from <u><b>**${flLower.toUpperCase()}**</b></u> ⏳`);
-      await projectsRead(ctx, fl, flLower, firstLoad);
-      firstLoad = false;
+      await projectsRead(ctx, fl, flLower, freelanceArr[fl].firstLoad);
+      freelanceArr[fl].firstLoad = false;
     }
   } else {
+    // если идет загрузка в данный момент, то просто выводим имеющиеся проекты
     curScene.val = flLower;
 
     await ctx.scene.enter(`freelance`, {
@@ -360,25 +391,30 @@ const freelanceBtnClick = async (ctx, fl, isLoading) => {
 
 // ? listeners****************************************************
 bot.start(async (ctx) => {
+  // при команде /start отправляем клиенту меню, сохраняем id чата и сообщения menu, для будущего обновления
   let menuObj = menu(freelanceArr);
 
   let response = await ctx.replyWithHTML(menuObj.inProgress, menuObj.extra);
   menu_msg_id = response.message_id;
   chat_id = response.chat.id;
 
+  // вешаем событие на обновление кнопок меню
   eventEmitter.on('update-freelance-btns', async () => {
     await updateFreelanceBtns(ctx);
   });
 });
 
 bot.on('callback_query', async (ctx) => {
+  // события при нажатии на кнопки
   let { fl, isl, type } = JSON.parse(ctx.callbackQuery.data);
 
+  // если текущая сцена не равна null, то выводим сообщение(чтобы при нажатии на кнопки главной сцены ничего не происходило, если мы находится не на главной сцене)
   if (curScene.val !== null) {
     await ctx.answerCbQuery('You are not on main scene. First quit from freelance scene.');
     return;
   }
 
+  // нажатие на кнопки
   if (type === 'fl') {
     await freelanceBtnClick(ctx, fl, !!isl);
   } else if (type === 'abort') {

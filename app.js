@@ -20,13 +20,12 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
 app.use(cors());
-app.locals.bot = bot;
 
-//все роуты происходят с главной страницы, так как приложение на Vue (Spa)
 const freelanceRoutes = require('./routes/freelance')(router);
 app.use('/', freelanceRoutes);
 
 app.use(express.static(path.join(__dirname, 'dist')));
+//при заходе на любой url кроме тех, что определены в роутере, отдаем страницу index.html, так как у нас SPA на Vue
 app.get('/', (req, res) => {
   res.status(200).sendFile('index.html', { root: path.join(__dirname, 'dist') });
 });
